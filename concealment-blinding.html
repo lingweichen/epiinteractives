@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Concealment vs. blinding</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/epi.css">
+<style>
+  .bins { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  @media (max-width: 680px) { .bins { grid-template-columns: 1fr; } }
+  .zone { border: 2px dashed var(--rule); border-radius: 8px; padding: 12px; min-height: 140px; }
+  .zone.over { border-style: solid; border-color: var(--ink); background: var(--paper); }
+  .zone[data-zone="pool"] { background: var(--paper); }
+  .zone h3 small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; }
+  .cards { display: flex; flex-direction: column; gap: 8px; min-height: 40px; }
+  .zone[data-zone="pool"] .cards { flex-direction: row; flex-wrap: wrap; }
+  .card {
+    font: inherit; font-size: 15px; text-align: left; line-height: 1.35;
+    padding: 9px 12px; border-radius: 6px; border: 1px solid var(--ink);
+    background: var(--surface); color: var(--ink); cursor: grab; user-select: none; max-width: 100%;
+  }
+  .zone[data-zone="pool"] .card { flex: 1 1 260px; }
+  .card.dragging { cursor: grabbing; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+  .card.right { border-color: var(--good); border-width: 2px; }
+  .card.wrong { border-color: var(--bad); border-width: 2px; }
+  .card .why { display: none; margin-top: 6px; font-size: 13px; color: var(--muted); }
+  .card.right .why, .card.wrong .why { display: block; }
+  .card .mark { font-weight: 800; margin-right: 6px; }
+  .card .mark:empty { display: none; }
+  .card.right .mark { color: var(--good); }
+  .card.wrong .mark { color: var(--bad); }
+  .score { font-weight: 700; margin-left: 8px; align-self: center; }
+  .switches { display: grid; gap: 10px; }
+  .switch {
+    font: inherit; display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 10px 14px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); color: var(--ink); cursor: pointer; text-align: left;
+  }
+  .switch .state { font-size: 14px; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: var(--paper); color: var(--muted); white-space: nowrap; }
+  .switch[aria-pressed="true"] { border-color: var(--ink); }
+  .switch[aria-pressed="true"] .state { background: var(--ink); color: var(--paper); }
+  .design-name { font-size: 28px; font-weight: 800; margin: 4px 0 6px; }
+  .opts { display: grid; gap: 8px; margin: 12px 0; }
+  .opt { font: inherit; text-align: left; padding: 9px 12px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); cursor: pointer; }
+  .opt.right { border-color: var(--good); border-width: 2px; }
+  .opt.wrong { border-color: var(--bad); border-width: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <a class="back" href="index.html" data-i18n="back">All activities</a>
+    <div class="lang-toggle" role="group" aria-label="Language / 語言"><button data-lang="en" lang="en">English</button><button data-lang="zh" lang="zh-Hant">繁體中文</button></div>
+  </header>
+
+  <h1 data-i18n="title">Concealment vs. blinding</h1>
+  <p class="lede" data-i18n="lede">Allocation concealment and blinding (masking) are easy to mix up. Watch what each protects against, and what goes wrong without it.</p>
+
+  <section class="panel loop-panel" id="loop" aria-label="Animated step-by-step explainer" data-i18n-aria="loopAria"></section>
+
+  <section class="panel missions" id="missions" style="margin-bottom:20px"></section>
+
+  <section class="panel" data-challenge style="margin-top:20px">
+    <h2 data-i18n="sortH">Sort the statements</h2>
+    <div class="btn-row">
+      <button class="btn" id="checkBtn" data-i18n="check">Check my answers</button>
+      <button class="btn ghost" id="resetBtn" data-i18n="reset">Reset</button>
+      <span class="score" id="score" aria-live="polite"></span>
+      <span class="score num" id="timer" style="margin-left:auto;color:var(--muted)"></span>
+    </div>
+    <p class="small" data-i18n="hint">Drag a statement into a box. Tapping a statement moves it along: unsorted, concealment, blinding.</p>
+    <div class="zone" data-zone="pool"><h3 data-i18n="unsorted">Unsorted</h3><div class="cards" id="z-pool"></div></div>
+    <div class="bins">
+      <div class="zone" data-zone="conceal"><h3><span data-i18n="concealH">Allocation concealment</span><small data-i18n="concealSub">Hides the upcoming assignment</small></h3><div class="cards" id="z-conceal"></div></div>
+      <div class="zone" data-zone="blind"><h3><span data-i18n="blindH">Blinding (masking)</span><small data-i18n="blindSub">Hides the assignment already made</small></h3><div class="cards" id="z-blind"></div></div>
+    </div>
+  </section>
+
+  <div class="cols" style="margin-top:20px">
+    <section class="panel">
+      <h2 data-i18n="levelsH">Who is kept unaware?</h2>
+      <p class="small" data-i18n="levelsP">Switch each group on if they do not know which treatment each participant receives.</p>
+      <div class="switches" id="switches"></div>
+      <p class="small" style="margin:16px 0 0" data-i18n="thisIs">This design is called</p>
+      <div class="design-name" id="designName" aria-live="polite"></div>
+      <p id="designNote" class="small"></p>
+    </section>
+
+    <section class="panel" data-challenge style="margin-top:20px">
+      <h2 data-i18n="quizH">Quick quiz</h2>
+      <p data-i18n="quizQ">You are a research assistant in a trial of pill X for mental health. Your job is to assess participants' mental health with a validated instrument. One day, a mysterious email discloses every participant's intervention group. What kind of error can this introduce?</p>
+      <div class="opts" id="opts"></div>
+      <p id="quizFb" aria-live="polite"></p>
+    </section>
+  </div>
+
+  <section class="notice">
+    <h2 data-i18n="notice">What to notice</h2>
+    <ul>
+      <li data-i18n="n1">Concealment protects the randomization sequence during recruitment, before assignment, and prevents selection bias.</li>
+      <li data-i18n="n2">Blinding works after randomization, keeping participants, investigators or assessors unaware of the treatment received, and prevents information (observation or ascertainment) bias.</li>
+      <li data-i18n="n3">Blinding matters most when the outcome is subjective, such as self-reported pain. A placebo makes blinding possible, but a placebo or sham is not always feasible or ethical.</li>
+    </ul>
+  </section>
+</div>
+
+<script src="assets/epi.js"></script>
+<script src="assets/loops.js"></script>
+<script>
+const ITEMS = [
+  { k: "conceal", en: "Conceals the randomization sequence", zh: "隱藏隨機分派的序列",
+    wen: "Concealment keeps the next assignment unpredictable.", wzh: "分派隱匿讓下一個分派無法被預測。" },
+  { k: "blind", en: "Keeps participants or investigators unaware of the treatment received", zh: "讓受試者或研究者不知道所接受的治療",
+    wen: "That is the definition of blinding.", wzh: "這正是盲性作業的定義。" },
+  { k: "conceal", en: "Prevents selection bias", zh: "預防選樣偏差",
+    wen: "If recruiters can foresee the next assignment, they can steer who enrols in which arm, and the groups are no longer comparable.", wzh: "如果招募者能預知下一個分派，就能左右誰進入哪一組，兩組便不再可比較。" },
+  { k: "blind", en: "Prevents observation / ascertainment bias (information bias)", zh: "預防觀察／確認偏差（訊息偏差）",
+    wen: "Knowing the treatment can change how outcomes are reported or measured.", wzh: "知道治療組別可能改變結果的回報或測量方式。" },
+  { k: "conceal", en: "Done during recruitment, before randomization", zh: "於招募期間、隨機分派之前執行",
+    wen: "It protects the moment a patient enters the trial.", wzh: "它保護的是病人進入試驗的那一刻。" },
+  { k: "blind", en: "Happens after the patient has been randomized", zh: "在病人隨機分派之後進行",
+    wen: "Blinding is maintained throughout follow-up.", wzh: "盲性作業在追蹤期間持續維持。" },
+  { k: "conceal", en: "Sequentially numbered, sealed, opaque envelopes", zh: "依序編號、密封且不透光的信封",
+    wen: "A classic (though not foolproof) way to conceal allocation; central computer allocation is safer.", wzh: "傳統的分派隱匿方式（但並非萬無一失）；中央電腦分派更安全。" },
+  { k: "blind", en: "A placebo pill that looks identical to the active drug", zh: "外觀與試驗藥物完全相同的安慰劑",
+    wen: "A matching placebo makes blinding possible.", wzh: "外觀相同的安慰劑讓盲性作業得以進行。" },
+  { k: "conceal", en: "A surgeon keeps opening envelopes until he finds “radical mastectomy”", zh: "外科醫師一直拆信封，直到拆到「根除性乳房切除術」",
+    wen: "A failure of concealment: the surgeon chose the assignment, so selection bias can enter.", wzh: "這是分派隱匿失敗：醫師自己挑選分派，選樣偏差因而可能產生。" },
+  { k: "blind", en: "The outcome assessor learns everyone's group from an email", zh: "結果評估者從一封電子郵件得知每個人的組別",
+    wen: "Assignment has already happened; the assessor is unblinded, so measurement may be biased.", wzh: "分派早已完成；評估者失去盲性，測量可能產生偏差。" },
+  { k: "conceal", en: "Can be done in every randomized trial", zh: "每一個隨機試驗都能做到",
+    wen: "Hiding the upcoming assignment is always possible, whatever the intervention.", wzh: "無論介入為何，隱藏即將進行的分派永遠可行。" },
+  { k: "blind", en: "Not always possible, e.g. dietary pattern or surgery trials", zh: "不一定可行，例如飲食型態或手術試驗",
+    wen: "People usually know what they eat, and sham surgery raises ethical problems.", wzh: "人通常知道自己吃了什麼，假手術也有倫理問題。" }
+];
+const start = [4, 9, 0, 7, 2, 11, 5, 8, 1, 10, 3, 6];
+
+const SW = [
+  { id: "p", en: "Trial participants", zh: "試驗受試者" },
+  { id: "i", en: "Investigators / clinicians", zh: "研究者／臨床醫師" },
+  { id: "a", en: "Outcome assessors / data analysts", zh: "結果評估者／資料分析者" }
+];
+const masked = { p: false, i: false, a: false };
+
+const OPTS = [
+  { k: "A", en: "Information bias", zh: "訊息偏差", ok: true },
+  { k: "B", en: "Selection bias", zh: "選樣偏差" },
+  { k: "C", en: "Confounding", zh: "干擾" },
+  { k: "D", en: "Chance", zh: "機遇" },
+  { k: "E", en: "Reverse causation", zh: "反向因果" }
+];
+let picked = null;
+
+const I18N = {
+  en: {
+    pageTitle: "Concealment vs. blinding", title: "Concealment vs. blinding",
+    lede: "Allocation concealment and blinding (masking) are easy to mix up. Watch what each protects against, and what goes wrong without it.",
+    sortH: "Sort the statements", hint: "Drag a statement into a box. Tapping a statement moves it along: unsorted, concealment, blinding.",
+    unsorted: "Unsorted", concealH: "Allocation concealment", concealSub: "Hides the upcoming assignment",
+    blindH: "Blinding (masking)", blindSub: "Hides the assignment already made",
+    score: "{r} of {n} correct", left: "{n} still unsorted",
+    levelsH: "Who is kept unaware?", levelsP: "Switch each group on if they do not know which treatment each participant receives.",
+    aware: "Aware", unaware: "Not aware", thisIs: "This design is called",
+    d0: "Unblinded (open label)", d1: "Single-blind", d2: "Double-blind", d3: "Triple-blind", dx: "No standard label",
+    n0: "Everyone knows the assignment.", n1d: "Only the participants are unaware.", n2d: "Participants and investigators are unaware; the analyst knows.", n3d: "Participants, investigators and analysts are all unaware.",
+    nx: "Labels like “double-blind” are used inconsistently. Report exactly who was masked; an open trial with blinded outcome assessment is a common, legitimate design.",
+    quizH: "Quick quiz",
+    quizQ: "You are a research assistant in a trial of pill X for mental health. Your job is to assess participants' mental health with a validated instrument. One day, a mysterious email discloses every participant's intervention group. What kind of error can this introduce?",
+    qRight: "Correct. The assessor is no longer blinded, so knowing the group can influence how mental health is rated: information (observation) bias.",
+    qWrong: "Not quite. Randomization has already happened, so who entered each arm is unaffected. What changes is how the outcome may be measured. Try again.",
+    n1: "Concealment protects the randomization sequence during recruitment, before assignment, and prevents selection bias.",
+    n2: "Blinding works after randomization, keeping participants, investigators or assessors unaware of the treatment received, and prevents observation / ascertainment bias (information bias).",
+    n3: "Blinding matters most when the outcome is subjective, such as self-reported pain. A placebo makes blinding possible, but a placebo or sham is not always feasible or ethical."
+  },
+  zh: {
+    pageTitle: "分派隱匿與盲性作業", title: "分派隱匿與盲性作業",
+    lede: "分派隱匿（allocation concealment）與盲性作業（blinding／masking）很容易混淆。看看它們各自防止什麼，以及缺少它們會出什麼錯。",
+    sortH: "分類敘述", hint: "把敘述拖進框中。點一下敘述會依序移動：未分類、分派隱匿、盲性作業。",
+    unsorted: "未分類", concealH: "分派隱匿", concealSub: "隱藏即將進行的分派",
+    blindH: "盲性作業（遮蔽）", blindSub: "隱藏已經完成的分派",
+    score: "答對 {r}／{n} 題", left: "還有 {n} 題未分類",
+    levelsH: "誰不知道分派結果？", levelsP: "若該群人不知道每位受試者接受哪一種治療，就把開關打開。",
+    aware: "知道", unaware: "不知道", thisIs: "這種設計稱為",
+    d0: "非盲（開放標籤）", d1: "單盲", d2: "雙盲", d3: "三盲", dx: "沒有標準名稱",
+    n0: "所有人都知道分派結果。", n1d: "只有受試者不知道。", n2d: "受試者與研究者不知道；分析者知道。", n3d: "受試者、研究者與分析者都不知道。",
+    nx: "「雙盲」等名稱的用法並不一致。應明確報告誰被遮蔽；開放治療但結果評估採盲性作業，是常見且合理的設計。",
+    quizH: "小測驗",
+    quizQ: "你是一項評估藥丸 X 改善心理健康效果之臨床試驗的研究助理，工作是用經過驗證的量表評估受試者的心理健康。某天你收到一封神秘電子郵件，揭露了所有受試者的介入組別。這可能為研究帶來哪一種誤差？",
+    qRight: "正確。評估者失去盲性，知道組別可能影響心理健康的評分，造成訊息（觀察）偏差。",
+    qWrong: "不太對。隨機分派已經完成，誰進入哪一組不受影響；改變的是結果可能如何被測量。再試一次。",
+    n1: "分派隱匿在招募期間、分派之前保護隨機序列，預防選樣偏差。",
+    n2: "盲性作業在隨機分派之後發揮作用，讓受試者、研究者或評估者不知道所接受的治療，預防觀察／確認偏差（訊息偏差）。",
+    n3: "當結果是主觀指標（例如自評疼痛）時，盲性作業最重要。安慰劑讓盲性作業成為可能，但安慰劑或假手術不一定可行或合乎倫理。"
+  }
+};
+
+const zones = { pool: document.getElementById("z-pool"), conceal: document.getElementById("z-conceal"), blind: document.getElementById("z-blind") };
+const state = ITEMS.map(() => "pool");
+const els = [];
+let checked = false;
+let tStart = 0, tEnd = 0, tick = 0, perfectSort = false, fastSort = false, quizRight = false;
+function startTimer() {
+  if (tStart) return;
+  tStart = Date.now();
+  tick = setInterval(() => { const el = document.getElementById("timer"); if (!el) return clearInterval(tick); el.textContent = "⏱ " + Math.round(((tEnd || Date.now()) - tStart) / 1000) + " s"; }, 250);
+}
+
+function buildCards() {
+  start.forEach(i => {
+    const b = document.createElement("button");
+    b.className = "card";
+    b.innerHTML = `<span class="mark"></span><span class="txt"></span><span class="why"></span>`;
+    Epi.dragToZones(b, {
+      onDrop: (el, z) => place(i, z),
+      onTap: () => place(i, { pool: "conceal", conceal: "blind", blind: "pool" }[state[i]])
+    });
+    els[i] = b;
+    zones.pool.appendChild(b);
+  });
+}
+function place(i, z) { startTimer(); state[i] = z; zones[z].appendChild(els[i]); checked = false; render(); }
+
+function render() {
+  const L = Epi.lang;
+  ITEMS.forEach((it, i) => {
+    const el = els[i];
+    el.querySelector(".txt").textContent = it[L];
+    el.querySelector(".why").textContent = it["w" + L];
+    el.classList.remove("right", "wrong");
+    el.querySelector(".mark").textContent = "";
+    if (checked && state[i] !== "pool") {
+      const ok = state[i] === it.k;
+      el.classList.add(ok ? "right" : "wrong");
+      el.querySelector(".mark").textContent = ok ? "✓" : "✗";
+    }
+  });
+  const sc = document.getElementById("score");
+  if (checked) {
+    const r = ITEMS.filter((it, i) => state[i] === it.k).length;
+    const left = state.filter(s => s === "pool").length;
+    sc.textContent = Epi.t("score", { r, n: ITEMS.length }) + (left ? "; " + Epi.t("left", { n: left }) : "");
+  } else sc.textContent = "";
+
+  // blinding levels
+  const box = document.getElementById("switches");
+  box.innerHTML = SW.map(s => `<button class="switch" data-id="${s.id}" aria-pressed="${masked[s.id]}"><span>${s[L]}</span><span class="state">${Epi.t(masked[s.id] ? "unaware" : "aware")}</span></button>`).join("");
+  box.querySelectorAll(".switch").forEach(b => b.onclick = () => { const id = b.dataset.id; masked[id] = !masked[id]; render(); box.querySelector(`[data-id="${id}"]`).focus(); });
+  const key = (masked.p ? "p" : "") + (masked.i ? "i" : "") + (masked.a ? "a" : "");
+  const map = { "": ["d0", "n0"], p: ["d1", "n1d"], pi: ["d2", "n2d"], pia: ["d3", "n3d"] };
+  const m = map[key] || ["dx", "nx"];
+  document.getElementById("designName").textContent = Epi.t(m[0]);
+  document.getElementById("designNote").textContent = Epi.t(m[1]);
+
+  // quiz
+  const ob = document.getElementById("opts");
+  ob.innerHTML = OPTS.map(o => `<button class="opt ${picked === o.k ? (o.ok ? "right" : "wrong") : ""}" data-k="${o.k}">${o.k}. ${o[L]}</button>`).join("");
+  ob.querySelectorAll(".opt").forEach(b => b.onclick = () => { picked = b.dataset.k; render(); ob.querySelector(`[data-k="${picked}"]`).focus(); });
+  const fb = document.getElementById("quizFb");
+  fb.textContent = picked ? Epi.t(OPTS.find(o => o.k === picked).ok ? "qRight" : "qWrong") : "";
+  fb.className = picked ? (OPTS.find(o => o.k === picked).ok ? "good" : "bad") : "";
+  if (picked && OPTS.find(o => o.k === picked).ok) quizRight = true;
+  Epi.check();
+}
+
+buildCards();
+Epi.missions("concealment-blinding", document.getElementById("missions"), [
+  { id: "sort", en: "Sort all 12 statements correctly.", zh: "把 12 個敘述全部分類正確。", test: () => perfectSort },
+  { id: "fast", en: "Speed round: a perfect sort in 60 seconds or less (press Reset to restart the clock).", zh: "限時挑戰：60 秒內完美分類（按重設可重新計時）。", test: () => fastSort },
+  { id: "triple", en: "Switch on the masking needed for a triple-blind trial.", zh: "打開三盲試驗所需的所有遮蔽。", test: () => masked.p && masked.i && masked.a },
+  { id: "probe", en: "Find a design with no standard label.", zh: "找出一種沒有標準名稱的設計。", test: () => { const k = (masked.p ? "p" : "") + (masked.i ? "i" : "") + (masked.a ? "a" : ""); return !["", "p", "pi", "pia"].includes(k); } },
+  { id: "quiz", en: "Answer the quiz correctly.", zh: "答對小測驗。", test: () => quizRight }
+]);
+document.getElementById("checkBtn").onclick = () => {
+  checked = true;
+  const all = ITEMS.every((it, i) => state[i] === it.k);
+  if (all) {
+    perfectSort = true; tEnd = tEnd || Date.now(); clearInterval(tick);
+    const secs = (tEnd - tStart) / 1000; if (tStart && secs <= 60) fastSort = true;
+    document.getElementById("timer").textContent = "⏱ " + Math.round(secs) + " s";
+    const b = document.getElementById("checkBtn").getBoundingClientRect(); Epi.confetti(b.left + b.width / 2, b.top);
+  }
+  render();
+};
+document.getElementById("resetBtn").onclick = () => {
+  Epi.flip(els, () => start.forEach(i => { state[i] = "pool"; zones.pool.appendChild(els[i]); }), { stagger: 20 });
+  checked = false; tStart = 0; tEnd = 0; clearInterval(tick); document.getElementById("timer").textContent = ""; render();
+};
+Epi.loopAnim(document.getElementById("loop"), EpiLoops["concealment-blinding"]);
+Epi.init(I18N, render);
+</script>
+</body>
+</html>

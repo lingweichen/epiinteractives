@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Agreement beyond chance: kappa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/epi.css">
+<style>
+  .kt { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .kt th, .kt td { border: 1px solid var(--rule); padding: 10px 12px; text-align: center; }
+  .kt th { font-size: 13px; color: var(--muted); font-weight: 600; }
+  .kt td.agree { background: var(--a-soft); }
+  .kt .exp { display: block; font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .kt td.tot { font-weight: 700; }
+  .seg-bar { position: relative; height: 46px; display: flex; border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); }
+  .seg-bar > div { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; transition: width .25s; }
+  .s-chance { background: var(--rule); color: var(--ink); }
+  .s-beyond { background: var(--a); color: #fff; }
+  .s-dis { background: repeating-linear-gradient(45deg, var(--surface), var(--surface) 5px, var(--paper) 5px, var(--paper) 10px); color: var(--muted); }
+  .scale { position: relative; margin: 34px 0 8px; height: 14px; display: flex; border-radius: 4px; overflow: visible; }
+  .scale > span { height: 100%; display: block; }
+  .scale .marker { position: absolute; top: -26px; transform: translateX(-50%); font-weight: 800; font-size: 14px; transition: left .25s; }
+  .scale .marker::after { content: ""; position: absolute; left: 50%; top: 20px; width: 2px; height: 22px; background: var(--ink); transform: translateX(-50%); }
+  .scale-labels { display: grid; grid-template-columns: 40fr 35fr 25fr; font-size: 12px; color: var(--muted); gap: 4px; }
+  .scale-labels span:last-child { text-align: right; }
+  .tiles { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+  .tile { width: 22px; height: 22px; display: flex; border-radius: 4px; overflow: hidden; border: 1px solid var(--rule); }
+  .tile i { flex: 1; display: block; }
+  .tile i.y { background: var(--a); }
+  .tile i.n { background: var(--paper); }
+  .tile.dis { border: 2px solid var(--bad); }
+  .tile-key { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-top: 8px; align-items: center; }
+  .row-k { display: flex; gap: 30px; flex-wrap: wrap; align-items: flex-end; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <a class="back" href="index.html" data-i18n="back">All activities</a>
+    <div class="lang-toggle" role="group" aria-label="Language / 語言"><button data-lang="en" lang="en">English</button><button data-lang="zh" lang="zh-Hant">繁體中文</button></div>
+  </header>
+
+  <h1 data-i18n="title">Agreement beyond chance: kappa</h1>
+  <p class="lede" data-i18n="lede">Two physicians examine the same patients for swollen knees. Even if they guessed, they would agree some of the time. Kappa asks how much better their agreement is than chance alone. Drag the numbers in the table to see.</p>
+
+  <section class="panel loop-panel" id="loop" aria-label="Animated step-by-step explainer" data-i18n-aria="loopAria"></section>
+
+  <section class="panel missions" id="missions" style="margin-bottom:20px"></section>
+
+  <div class="cols-2-1">
+    <section class="panel">
+      <h2 data-i18n="tabH">Ratings of the same patients</h2>
+      <div class="btn-row" id="presets"></div>
+      <div class="scroll-x">
+        <table class="kt">
+          <thead>
+            <tr><th></th><th data-i18n="aYes">Physician A: yes</th><th data-i18n="aNo">Physician A: no</th><th data-i18n="tot">Total</th></tr>
+          </thead>
+          <tbody>
+            <tr><th data-i18n="bYes">Physician B: yes</th>
+              <td class="agree"><input class="scrub" id="a" type="number" min="0" max="500"><span class="exp" id="ea"></span></td>
+              <td><input class="scrub" id="b" type="number" min="0" max="500"><span class="exp" id="eb"></span></td>
+              <td class="tot" id="r1"></td></tr>
+            <tr><th data-i18n="bNo">Physician B: no</th>
+              <td><input class="scrub" id="c" type="number" min="0" max="500"><span class="exp" id="ec"></span></td>
+              <td class="agree"><input class="scrub" id="d" type="number" min="0" max="500"><span class="exp" id="ed"></span></td>
+              <td class="tot" id="r2"></td></tr>
+            <tr><th data-i18n="tot">Total</th><td class="tot" id="c1"></td><td class="tot" id="c2"></td><td class="tot" id="nn"></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small" style="margin-top:8px"><span data-i18n="dragHint">Drag a number left or right, or click to type.</span> <span data-i18n="expHint">Grey numbers are the counts expected by chance alone: row total × column total ÷ N. Shaded cells are agreements.</span></p>
+
+      <h2 style="margin-top:22px" data-i18n="barH">Where the agreement comes from</h2>
+      <div class="seg-bar" id="segbar"><div class="s-chance" id="sChance"></div><div class="s-beyond" id="sBeyond"></div><div class="s-dis" id="sDis"></div></div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--rule)"></i><span data-i18n="lgChance">Agreement expected by chance</span></span>
+        <span><i class="sw" style="background:var(--a)"></i><span data-i18n="lgBeyond">Agreement beyond chance</span></span>
+        <span><i class="sw" style="background:var(--paper);border:1px solid var(--rule)"></i><span data-i18n="lgDis">Disagreement</span></span>
+      </div>
+      <h2 style="margin-top:22px" data-i18n="tilesH">Patient by patient</h2>
+      <p class="small" id="tilesNote"></p>
+      <div class="tiles" id="tiles" aria-hidden="true"></div>
+      <div class="tile-key">
+        <span class="tile" style="width:28px"><i class="y"></i><i class="n"></i></span><span data-i18n="tileKey">left half = physician A, right half = physician B; blue = swollen</span>
+        <span class="tile dis"><i class="y"></i><i class="n"></i></span><span data-i18n="tileDis">disagreement</span>
+      </div>
+      <p class="small" style="margin-top:8px" data-i18n="barNote">Kappa is the blue part divided by everything to the right of the grey part: the share of the possible improvement over chance that the physicians actually achieved.</p>
+    </section>
+
+    <aside class="panel">
+      <h2 data-i18n="resH">Kappa</h2>
+      <div class="formula" id="calc"></div>
+      <div class="row-k" style="margin-top:12px"><div><div class="small">κ</div><div class="big" id="kap"></div></div><div id="interp" style="font-weight:700;padding-bottom:6px"></div></div>
+      <div class="scale" aria-hidden="true">
+        <span style="width:40%;background:var(--b-soft)"></span><span style="width:35%;background:var(--a-soft)"></span><span style="width:25%;background:var(--a)"></span>
+        <div class="marker" id="mark"></div>
+      </div>
+      <div class="scale-labels"><span data-i18n="poor">&lt; 0.40 poor</span><span data-i18n="mid">0.40 to 0.75 intermediate to good</span><span data-i18n="exc">&gt; 0.75 excellent</span></div>
+      <p class="small" style="margin-top:10px" data-i18n="lk">Benchmarks as suggested by Landis and Koch.</p>
+    </aside>
+  </div>
+
+  <section class="panel game" data-challenge style="margin-top:20px">
+    <h2 data-i18n="gameH">Game: guess the kappa</h2>
+    <p class="small" data-i18n="gameP">Look at the table, estimate kappa in your head, then check. Within 0.10 counts as a hit.</p>
+    <div id="game"></div>
+  </section>
+
+  <section class="notice">
+    <h2 data-i18n="notice">What to notice</h2>
+    <ul>
+      <li data-i18n="n1">Load “Two coin-flipping raters”: they agree half the time, yet kappa is 0. All of their agreement is what chance alone would produce.</li>
+      <li data-i18n="n2">Load “A rare finding”: the physicians agree on 92% of patients, but kappa is low, because when almost everyone is “no”, chance agreement is already very high.</li>
+      <li data-i18n="n3">Kappa = (observed agreement − chance agreement) ÷ (1 − chance agreement).</li>
+    </ul>
+  </section>
+</div>
+
+<script src="assets/epi.js"></script>
+<script src="assets/loops.js"></script>
+<script>
+const PRE = { slide: [25, 15, 5, 55], coin: [25, 25, 25, 25], rare: [1, 4, 4, 91], perfect: [30, 0, 0, 70] };
+const I18N = {
+  en: {
+    pageTitle: "Agreement beyond chance: kappa", title: "Agreement beyond chance: kappa",
+    lede: "Two physicians examine the same patients for swollen knees. Even if they guessed, they would agree some of the time. Kappa asks how much better their agreement is than chance alone. Drag the numbers in the table to see.",
+    tabH: "Ratings of the same patients", aYes: "Physician A: yes", aNo: "Physician A: no", bYes: "Physician B: yes", bNo: "Physician B: no", tot: "Total",
+    pSlide: "Office hour example", pCoin: "Two coin-flipping raters", pRare: "A rare finding", pPerfect: "Perfect agreement",
+    expHint: "Grey numbers are the counts expected by chance alone: row total × column total ÷ N. Shaded cells are agreements.",
+    exp: "chance: {v}",
+    barH: "Where the agreement comes from",
+    lgChance: "Agreement expected by chance", lgBeyond: "Agreement beyond chance", lgDis: "Disagreement",
+    barNote: "Kappa is the blue part divided by everything to the right of the grey part: the share of the possible improvement over chance that the physicians actually achieved.",
+    gameH: "Game: guess the kappa", gameP: "Look at the table, estimate kappa in your head, then check. Within 0.10 counts as a hit.",
+    gq: "Two raters classify {n} patients. What is kappa?", gLabel: "Your guess for kappa",
+    gx: "Observed agreement = ({a} + {d}) / {n} = {po}. Chance agreement = {pe}. κ = ({po} − {pe}) / (1 − {pe}) = <b>{k}</b>.",
+    resH: "Kappa",
+    tilesH: "Patient by patient", tileKey: "left half = physician A, right half = physician B; blue = swollen", tileDis: "disagreement",
+    tilesAll: "Each square is one patient.", tilesScaled: "Each square is one patient, rescaled to 100 patients.",
+    po: "Observed agreement", pe: "Expected agreement",
+    poor: "&lt; 0.40 poor", mid: "0.40 to 0.75 intermediate to good", exc: "&gt; 0.75 excellent",
+    iPoor: "Poor agreement", iMid: "Intermediate to good agreement", iExc: "Excellent agreement beyond chance", iNeg: "Worse than chance", iNa: "Not defined",
+    lk: "Benchmarks as suggested by Landis and Koch.",
+    n1: "Load “Two coin-flipping raters”: they agree half the time, yet kappa is 0. All of their agreement is what chance alone would produce.",
+    n2: "Load “A rare finding”: the physicians agree on 92% of patients, but kappa is low, because when almost everyone is “no”, chance agreement is already very high.",
+    n3: "Kappa = (observed agreement − chance agreement) ÷ (1 − chance agreement)."
+  },
+  zh: {
+    pageTitle: "超越機遇的一致性：Kappa", title: "超越機遇的一致性：Kappa",
+    lede: "兩位醫師檢查同一群病人是否有膝蓋腫脹。就算他們用猜的，也會有一部分結果相同。Kappa 問的是：他們的一致性比單憑機遇好多少？拖曳表格中的數字試試看。",
+    tabH: "同一群病人的評估結果", aYes: "醫師 A：有", aNo: "醫師 A：無", bYes: "醫師 B：有", bNo: "醫師 B：無", tot: "合計",
+    pSlide: "課堂範例", pCoin: "兩位擲硬幣的評估者", pRare: "罕見的發現", pPerfect: "完全一致",
+    expHint: "灰色數字是單憑機遇預期的人數：列合計 × 欄合計 ÷ N。底色格子代表兩人一致。",
+    exp: "機遇：{v}",
+    barH: "一致性從哪裡來",
+    lgChance: "機遇預期的一致", lgBeyond: "超越機遇的一致", lgDis: "不一致",
+    barNote: "Kappa 是藍色部分除以灰色部分右邊的全部：在可能超越機遇的空間中，醫師實際做到了多少比例。",
+    gameH: "遊戲：猜猜 kappa", gameP: "看著表格在心中估計 kappa，再看答案。誤差在 0.10 以內就算猜中。",
+    gq: "兩位評估者分類 {n} 位病人。kappa 是多少？", gLabel: "你猜的 kappa",
+    gx: "觀察一致性 =（{a} + {d}）/ {n} = {po}。機遇一致性 = {pe}。κ =（{po} − {pe}）/（1 − {pe}）= <b>{k}</b>。",
+    resH: "Kappa 值",
+    tilesH: "逐一檢視每位病人", tileKey: "左半 = 醫師 A，右半 = 醫師 B；藍色 = 腫脹", tileDis: "不一致",
+    tilesAll: "每個方格代表一位病人。", tilesScaled: "每個方格代表一位病人（已換算為 100 位病人）。",
+    po: "觀察一致性", pe: "期望一致性",
+    poor: "&lt; 0.40 差", mid: "0.40 至 0.75 中等至良好", exc: "&gt; 0.75 極佳",
+    iPoor: "一致性差", iMid: "中等至良好的一致性", iExc: "超越機遇的極佳一致性", iNeg: "比機遇還差", iNa: "無法定義",
+    lk: "判讀標準依 Landis 與 Koch 的建議。",
+    n1: "載入「兩位擲硬幣的評估者」：他們有一半的時間結果相同，但 kappa 為 0，因為所有一致都只是機遇造成的。",
+    n2: "載入「罕見的發現」：兩位醫師對 92% 的病人判斷一致，kappa 卻很低，因為幾乎所有人都是「無」時，機遇一致性本來就非常高。",
+    n3: "Kappa =（觀察一致性 − 機遇一致性）÷（1 − 機遇一致性）。"
+  }
+};
+const ins = ["a", "b", "c", "d"].map(k => document.getElementById(k));
+const set = (id, v) => document.getElementById(id).textContent = v;
+
+function load(v) { v.forEach((x, i) => ins[i].value = x); update(); }
+function update() {
+  const [a, b, c, d] = ins.map(e => Math.max(0, Number(e.value) || 0));
+  const N = a + b + c + d, r1 = a + b, r2 = c + d, c1 = a + c, c2 = b + d;
+  set("r1", r1); set("r2", r2); set("c1", c1); set("c2", c2); set("nn", N);
+  const e = [r1 * c1 / N, r1 * c2 / N, r2 * c1 / N, r2 * c2 / N];
+  ["ea", "eb", "ec", "ed"].forEach((id, i) => set(id, Epi.t("exp", { v: N ? (Math.round(e[i] * 10) / 10) : "—" })));
+  const po = (a + d) / N, pe = ((r1 / N) * (c1 / N)) + ((r2 / N) * (c2 / N));
+  const k = (po - pe) / (1 - pe);
+  const f2 = x => Epi.fmt(x, 2);
+  document.getElementById("calc").innerHTML =
+    `<p>${Epi.t("po")} = (${a} + ${d}) / ${N} = <b>${f2(po)}</b></p>` +
+    `<p>${Epi.t("pe")} = (${r1}/${N} × ${c1}/${N}) + (${r2}/${N} × ${c2}/${N}) = <b>${f2(pe)}</b></p>` +
+    `<p>κ = (${f2(po)} − ${f2(pe)}) / (1 − ${f2(pe)})</p>`;
+  set("kap", f2(k));
+  lastK = k; lastPo = po; lastDis = b + c;
+  Epi.check();
+  let key = "iNa";
+  if (isFinite(k)) key = k < 0 ? "iNeg" : k < 0.40 ? "iPoor" : k <= 0.75 ? "iMid" : "iExc";
+  set("interp", Epi.t(key));
+  const m = document.getElementById("mark");
+  m.style.left = (isFinite(k) ? Epi.clamp(k, 0, 1) * 100 : 0) + "%";
+  m.textContent = isFinite(k) ? f2(k) : "—";
+
+  const scale = N > 200 ? 100 / N : 1;
+  const cnt = [a, d, b, c].map(x => Math.round(x * scale));
+  const kinds = [["y", "y", ""], ["n", "n", ""], ["n", "y", "dis"], ["y", "n", "dis"]]; // [A, B]; b = A no / B yes, c = A yes / B no
+  let tiles = "";
+  cnt.forEach((n, k) => { for (let i = 0; i < n; i++) tiles += `<span class="tile ${kinds[k][2]}"><i class="${kinds[k][0]}"></i><i class="${kinds[k][1]}"></i></span>`; });
+  document.getElementById("tiles").innerHTML = tiles;
+  document.getElementById("tilesNote").textContent = Epi.t(scale === 1 ? "tilesAll" : "tilesScaled");
+  const w = x => (isFinite(x) ? Math.max(0, x) * 100 : 0);
+  const chance = Math.min(pe, po), beyond = Math.max(0, po - pe), dis = 1 - po;
+  const sc = document.getElementById("sChance"), sb = document.getElementById("sBeyond"), sd = document.getElementById("sDis");
+  sc.style.width = w(chance) + "%"; sb.style.width = w(beyond) + "%"; sd.style.width = w(dis) + "%";
+  sc.textContent = w(chance) > 10 ? Epi.pct(chance, 0) : "";
+  sb.textContent = w(beyond) > 8 ? "+" + Epi.pct(beyond, 0) : "";
+  sd.textContent = w(dis) > 8 ? Epi.pct(dis, 0) : "";
+}
+let lastK = NaN, lastPo = NaN, lastDis = 0, game = null;
+const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+function gameRound() {
+  let a, b, c, d, k;
+  do { a = ri(3, 45); d = ri(10, 70); b = ri(0, 20); c = ri(0, 20); const N = a + b + c + d, po = (a + d) / N, pe = ((a + b) * (a + c) + (c + d) * (b + d)) / (N * N); k = (po - pe) / (1 - pe); } while (!isFinite(k) || k < -0.2);
+  const N = a + b + c + d, po = (a + d) / N, pe = ((a + b) * (a + c) + (c + d) * (b + d)) / (N * N);
+  const tbl = () => `<table class="kt" style="margin-top:10px"><thead><tr><th></th><th>${Epi.t("aYes")}</th><th>${Epi.t("aNo")}</th></tr></thead>
+    <tbody><tr><th>${Epi.t("bYes")}</th><td class="agree"><b>${a}</b></td><td><b>${b}</b></td></tr><tr><th>${Epi.t("bNo")}</th><td><b>${c}</b></td><td class="agree"><b>${d}</b></td></tr></tbody></table>`;
+  return {
+    answer: Math.round(k * 100) / 100,
+    q: () => Epi.t("gq", { n: N }) + tbl(),
+    explain: () => Epi.t("gx", { a, d, n: N, po: po.toFixed(2), pe: pe.toFixed(2), k: k.toFixed(2) })
+  };
+}
+function renderPresets() {
+  const box = document.getElementById("presets");
+  box.innerHTML = [["slide", "pSlide"], ["coin", "pCoin"], ["rare", "pRare"], ["perfect", "pPerfect"]]
+    .map(([k, l]) => `<button class="btn ghost" data-k="${k}">${Epi.t(l)}</button>`).join("");
+  box.querySelectorAll("button").forEach(b => b.onclick = () => load(PRE[b.dataset.k]));
+}
+ins.forEach(el => Epi.scrub(el, update));
+game = Epi.guessGame(document.getElementById("game"), { min: -0.2, max: 1, step: 0.01, start: 0.4, tol: 0.1, fmt: v => (Math.round(v * 100) / 100).toFixed(2), round: gameRound, label: "gLabel" });
+Epi.missions("kappa", document.getElementById("missions"), [
+  { id: "zero", en: "Find a table where the physicians agree at least half the time, yet κ is 0.", zh: "找出一個表格：兩位醫師至少一半時間一致，但 κ 為 0。", test: () => lastPo >= 0.5 && Math.abs(lastK) <= 0.02 },
+  { id: "neg", en: "Make kappa negative: agreement worse than chance.", zh: "讓 kappa 變成負值：一致性比機遇還差。", test: () => lastK < 0 },
+  { id: "trap", en: "Agree on at least 90% of patients but keep κ below 0.40.", zh: "讓至少 90% 的病人判斷一致，但 κ 低於 0.40。", test: () => lastPo >= 0.9 && lastK < 0.4 },
+  { id: "exc", en: "Reach excellent agreement (κ above 0.75) despite at least 10 disagreements.", zh: "在至少 10 個不一致的情況下，達到極佳一致性（κ 大於 0.75）。", test: () => lastK > 0.75 && lastDis >= 10 },
+  { id: "game", en: "Game: guess kappa within 0.10 in 3 rounds.", zh: "遊戲：猜中 kappa（誤差 0.10 內）3 次。", test: () => game && game.hits >= 3 }
+]);
+load(PRE.slide);
+Epi.loopAnim(document.getElementById("loop"), EpiLoops["kappa"]);
+Epi.init(I18N, () => { renderPresets(); update(); if (game) game.render(); });
+</script>
+</body>
+</html>

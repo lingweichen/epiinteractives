@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sequential vs. simultaneous testing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/epi.css">
+<style>
+  .mode { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; margin-bottom: 16px; }
+  .mode button { font: inherit; font-weight: 600; border: 0; padding: 9px 16px; background: transparent; color: var(--muted); cursor: pointer; }
+  .mode button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .flow { display: grid; gap: 10px; }
+  .stage { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: stretch; }
+  @media (max-width: 600px) { .stage { grid-template-columns: 1fr; } }
+  .stage .step { font-weight: 700; font-size: 15px; padding-top: 8px; }
+  .stage .step small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; }
+  .boxes { display: flex; flex-wrap: wrap; gap: 10px; }
+  .bx { border: 1px solid var(--rule); border-radius: 8px; padding: 8px 12px; min-width: 150px; flex: 1 1 150px; }
+  .bx .h { font-size: 13px; font-weight: 700; }
+  .bx .c { font-variant-numeric: tabular-nums; font-size: 15px; margin-top: 2px; }
+  .bx .bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 6px; background: var(--paper); }
+  .bx .bar i { display: block; height: 100%; }
+  .bx.final-pos { border: 2px solid var(--ink); }
+  .bx.final-neg { border: 2px dashed var(--muted); }
+  .arrow { color: var(--muted); font-size: 13px; padding-left: 162px; }
+  @media (max-width: 600px) { .arrow { padding-left: 0; } }
+  .cmp { display: grid; grid-template-columns: 120px 1fr 64px; gap: 8px; align-items: center; font-size: 14px; margin: 5px 0; }
+  .cmp .track { height: 14px; background: var(--paper); border-radius: 4px; overflow: hidden; }
+  .cmp .fill { height: 100%; }
+  .cmp.net { font-weight: 700; }
+  .k { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  #crowd .p { transition: transform .9s cubic-bezier(.3,.7,.2,1); }
+  #crowd.instant .p { transition: none; }
+  #crowd text { font-size: 15px; font-weight: 700; fill: var(--ink); }
+  #crowd text.sub { font-weight: 400; fill: var(--muted); font-size: 13px; }
+  .tests-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <a class="back" href="index.html" data-i18n="back">All activities</a>
+    <div class="lang-toggle" role="group" aria-label="Language / 語言"><button data-lang="en" lang="en">English</button><button data-lang="zh" lang="zh-Hant">繁體中文</button></div>
+  </header>
+
+  <h1 data-i18n="title">Sequential vs. simultaneous testing</h1>
+  <p class="lede" data-i18n="lede">Two tests can be combined in two ways: retest only the people who were positive the first time, or give both tests to everyone and call anyone positive on either test positive. Drag the sliders and follow 1,000 people through each strategy.</p>
+
+  <section class="panel loop-panel" id="loop" aria-label="Animated step-by-step explainer" data-i18n-aria="loopAria"></section>
+
+  <section class="panel missions" id="missions" style="margin-bottom:20px"></section>
+
+  <div class="cols-2-1">
+    <section class="panel">
+      <div class="mode" role="group">
+        <button data-m="seq" data-i18n="mSeq">Sequential (A, then B)</button>
+        <button data-m="sim" data-i18n="mSim">Simultaneous (A and B)</button>
+      </div>
+      <div class="btn-row" style="align-items:center"><button class="btn play" id="playBtn" data-i18n="playBtn">Watch 100 people go through</button><span class="small" data-i18n="playHint">One dot = one person</span></div>
+      <svg id="crowd" viewBox="0 0 720 310" role="img" aria-label="100 people moving through the tests" style="width:100%;height:auto;display:block;margin-bottom:16px"></svg>
+      <div class="flow" id="flow" aria-live="polite"></div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--a)"></i><span data-i18n="lgD">Has disease</span></span>
+        <span><i class="sw" style="background:var(--b)"></i><span data-i18n="lgND">No disease</span></span>
+      </div>
+    </section>
+
+    <aside class="stack">
+      <section class="panel">
+        <h2 data-i18n="setH">Settings</h2>
+        <div class="field"><label for="prev"><span data-i18n="prevL">Prevalence (of 1,000 people)</span><output id="prevO"></output></label><input type="range" id="prev" min="1" max="60" step="1"></div>
+        <div class="tests-grid">
+          <div>
+            <h3 data-i18n="testA">Test A</h3>
+            <div class="field"><label for="sa"><span data-i18n="sens">Sensitivity</span><output id="saO"></output></label><input type="range" id="sa" min="50" max="100" step="1"></div>
+            <div class="field"><label for="pa"><span data-i18n="spec">Specificity</span><output id="paO"></output></label><input type="range" id="pa" min="50" max="100" step="1"></div>
+          </div>
+          <div>
+            <h3 data-i18n="testB">Test B</h3>
+            <div class="field"><label for="sb"><span data-i18n="sens">Sensitivity</span><output id="sbO"></output></label><input type="range" id="sb" min="50" max="100" step="1"></div>
+            <div class="field"><label for="pb"><span data-i18n="spec">Specificity</span><output id="pbO"></output></label><input type="range" id="pb" min="50" max="100" step="1"></div>
+          </div>
+        </div>
+        <button class="btn ghost" id="slideBtn" data-i18n="slideBtn">Load the office hour exercise</button>
+      </section>
+      <section class="panel">
+        <h2 data-i18n="resH">Net result</h2>
+        <div id="cmp"></div>
+        <p class="small" id="costs" style="margin-top:10px"></p>
+      </section>
+    </aside>
+  </div>
+
+  <section class="notice">
+    <h2 data-i18n="notice">What to notice</h2>
+    <ul>
+      <li data-i18n="n1">Sequential: net sensitivity = sensitivity A × sensitivity B, so sensitivity is lost, but specificity is gained. Fewer false positives, and fewer second tests to pay for.</li>
+      <li data-i18n="n2">Simultaneous: net specificity = specificity A × specificity B, so specificity is lost, but sensitivity is gained. Fewer missed cases.</li>
+      <li data-i18n="n3">The choice also depends on practical matters: how severe the disease is, cost, invasiveness of each test, length of hospital stay and insurance coverage.</li>
+      <li data-i18n="n4">These formulas assume the two tests make errors independently of each other.</li>
+    </ul>
+  </section>
+</div>
+
+<script src="assets/epi.js"></script>
+<script src="assets/loops.js"></script>
+<script>
+const I18N = {
+  en: {
+    pageTitle: "Sequential vs. simultaneous testing", title: "Sequential vs. simultaneous testing",
+    lede: "Two tests can be combined in two ways: retest only the people who were positive the first time, or give both tests to everyone and call anyone positive on either test positive. Drag the sliders and follow 1,000 people through each strategy.",
+    playBtn: "Watch 100 people go through", playHint: "One dot = one person",
+    bPop: "Everyone", bApos: "A positive: test B next", bAneg: "A negative: stop", bFpos: "Final: positive", bFneg: "Final: negative", bAny: "Positive on A or B", bNone: "Negative on both", bN: "{d} sick · {n} healthy",
+    mSeq: "Sequential (A, then B)", mSim: "Simultaneous (A and B)", shSeq: "Sequential", shSim: "Simultaneous",
+    lgD: "Has disease", lgND: "No disease",
+    setH: "Settings", prevL: "Prevalence (of 1,000 people)", testA: "Test A", testB: "Test B", sens: "Sensitivity", spec: "Specificity",
+    slideBtn: "Load the office hour exercise",
+    resH: "Net result",
+    pop: "Population", popS: "everyone screened",
+    stA: "Test A", stAs: "everyone", stB: "Test B", stBs: "only those positive on A",
+    stBoth: "Tests A and B", stBothS: "everyone gets both",
+    final: "Final result",
+    pos: "Positive", neg: "Negative",
+    posA: "A positive", negA: "A negative", posB: "B positive", negB: "B negative",
+    anyPos: "Positive on A or B", allNeg: "Negative on both",
+    dz: "{d} with disease, {n} without",
+    total: "{t} people",
+    stopNeg: "A negative: stop, called negative",
+    netSens: "Net sensitivity", netSpec: "Net specificity", aAlone: "A alone", bAlone: "B alone", netPpv: "PPV (net)",
+    costs: "Tests performed: {t} (A: {a}, B: {b}).",
+    n1: "Sequential: net sensitivity = sensitivity A × sensitivity B, so sensitivity is lost, but specificity is gained. Fewer false positives, and fewer second tests to pay for.",
+    n2: "Simultaneous: net specificity = specificity A × specificity B, so specificity is lost, but sensitivity is gained. Fewer missed cases.",
+    n3: "The choice also depends on practical matters: how severe the disease is, cost, invasiveness of each test, length of hospital stay and insurance coverage.",
+    n4: "These formulas assume the two tests make errors independently of each other."
+  },
+  zh: {
+    pageTitle: "序列檢測與同時檢測", title: "序列檢測與同時檢測",
+    lede: "兩種檢測有兩種組合方式：只對第一次陽性者再檢測一次；或讓每個人都接受兩種檢測，任一項陽性即判為陽性。拖曳滑桿，跟著 1,000 人走過每一種策略。",
+    playBtn: "看 100 個人走過檢測流程", playHint: "一個點 = 一個人",
+    bPop: "所有人", bApos: "A 陽性：接著做 B", bAneg: "A 陰性：停止", bFpos: "最終：陽性", bFneg: "最終：陰性", bAny: "A 或 B 任一陽性", bNone: "兩項皆陰性", bN: "有病 {d}・無病 {n}",
+    mSeq: "序列檢測（先 A 再 B）", mSim: "同時檢測（A 與 B）", shSeq: "序列檢測", shSim: "同時檢測",
+    lgD: "有病", lgND: "無病",
+    setH: "設定", prevL: "盛行率（1,000 人中）", testA: "檢測 A", testB: "檢測 B", sens: "靈敏度", spec: "特異度",
+    slideBtn: "載入課堂練習題",
+    resH: "淨結果",
+    pop: "族群", popS: "全部受檢者",
+    stA: "檢測 A", stAs: "所有人", stB: "檢測 B", stBs: "僅限 A 陽性者",
+    stBoth: "檢測 A 與 B", stBothS: "每個人都做兩項",
+    final: "最終結果",
+    pos: "陽性", neg: "陰性",
+    posA: "A 陽性", negA: "A 陰性", posB: "B 陽性", negB: "B 陰性",
+    anyPos: "A 或 B 任一陽性", allNeg: "兩項皆陰性",
+    dz: "有病 {d} 人，無病 {n} 人",
+    total: "{t} 人",
+    stopNeg: "A 陰性：停止，判為陰性",
+    netSens: "淨靈敏度", netSpec: "淨特異度", aAlone: "僅用 A", bAlone: "僅用 B", netPpv: "淨陽性預測值",
+    costs: "執行檢測次數：{t}（A：{a}，B：{b}）。",
+    n1: "序列檢測：淨靈敏度 = A 的靈敏度 × B 的靈敏度，因此靈敏度下降，但特異度上升；偽陽性較少，需要付費的第二次檢測也較少。",
+    n2: "同時檢測：淨特異度 = A 的特異度 × B 的特異度，因此特異度下降，但靈敏度上升；漏掉的病例較少。",
+    n3: "選擇哪一種也取決於實務考量：疾病嚴重度、成本、各檢測的侵入性、住院天數與保險給付。",
+    n4: "這些公式假設兩種檢測的誤差彼此獨立。"
+  }
+};
+const S = { prev: 20, sa: 95, pa: 90, sb: 90, pb: 95, mode: "seq" };
+const ids = ["prev", "sa", "pa", "sb", "pb"];
+const r = x => Math.round(x);
+const N = 1000;
+let lastSe = 0, lastSp = 0, lastPpv = 0, lastTests = 2000;
+
+// ---------- 100-person animation ----------
+const crowd = document.getElementById("crowd");
+const NS = "http://www.w3.org/2000/svg";
+const dotsP = [];
+for (let i = 0; i < 100; i++) {
+  const c = document.createElementNS(NS, "circle");
+  c.setAttribute("r", 5); c.setAttribute("class", "p");
+  c.style.transitionDelay = (Math.random() * 0.35).toFixed(2) + "s";
+  crowd.appendChild(c); dotsP.push(c);
+}
+const gLab = document.createElementNS(NS, "g"); crowd.appendChild(gLab);
+let curStage = 2, playTimers = [], played = { seq: false, sim: false };
+function people() {
+  const sa = S.sa / 100, pa = S.pa / 100, sb = S.sb / 100, pb = S.pb / 100;
+  const D = Math.round(S.prev), ND = 100 - D;
+  const P = [];
+  const aD = Math.round(D * sa), aN = Math.round(ND * (1 - pa));
+  const bD = Math.round(aD * sb), bN = Math.round(aN * (1 - pb));
+  const sD = Math.round(D * (1 - (1 - sa) * (1 - sb))), sN = Math.round(ND * (1 - pa * pb));
+  for (let i = 0; i < 100; i++) {
+    const dis = i < D, j = dis ? i : i - D;
+    P.push({ dis, aPos: dis ? j < aD : j < aN, bPos: dis ? j < bD : j < bN, sPos: dis ? j < sD : j < sN });
+  }
+  return P;
+}
+function layout(st) {
+  const P = people();
+  const bins = [];
+  const bin = (key, x, y, lab) => { let b = bins.find(q => q.key === key); if (!b) { b = { key, x, y, lab, m: [] }; bins.push(b); } return b; };
+  P.forEach((p, i) => {
+    let b;
+    if (st === 0) b = bin("pop", 20, 80, "bPop");
+    else if (S.mode === "seq") {
+      if (st === 1) b = p.aPos ? bin("ap", 270, 40, "bApos") : bin("an", 270, 185, "bAneg");
+      else b = p.aPos && p.bPos ? bin("fp", 530, 40, "bFpos") : bin("fn", 530, 185, "bFneg");
+    } else b = p.sPos ? bin("fp", 470, 40, "bAny") : bin("fn", 470, 185, "bNone");
+    b.m.push(i);
+  });
+  bins.forEach(b => b.m.sort((x, y) => (P[y].dis - P[x].dis) || (x - y)));
+  const pos = [];
+  bins.forEach(b => b.m.forEach((i, k) => { pos[i] = [b.x + 6 + (k % 10) * 12.5, b.y + 6 + Math.floor(k / 10) * 12.5]; }));
+  dotsP.forEach((c, i) => { c.style.transform = `translate(${pos[i][0]}px, ${pos[i][1]}px)`; c.style.fill = P[i].dis ? "var(--a)" : "var(--b)"; });
+  gLab.innerHTML = "";
+  bins.forEach(b => {
+    const d = b.m.filter(i => P[i].dis).length;
+    const t1 = document.createElementNS(NS, "text"); t1.setAttribute("x", b.x); t1.setAttribute("y", b.y - 20); t1.textContent = Epi.t(b.lab); gLab.appendChild(t1);
+    const t2 = document.createElementNS(NS, "text"); t2.setAttribute("x", b.x); t2.setAttribute("y", b.y - 4); t2.setAttribute("class", "sub"); t2.textContent = Epi.t("bN", { d, n: b.m.length - d }); gLab.appendChild(t2);
+  });
+}
+function showFinal() { playTimers.forEach(clearTimeout); crowd.classList.add("instant"); curStage = S.mode === "seq" ? 2 : 1; layout(curStage); crowd.getBoundingClientRect(); crowd.classList.remove("instant"); }
+function play() {
+  playTimers.forEach(clearTimeout); playTimers = [];
+  crowd.classList.add("instant"); layout(0); crowd.getBoundingClientRect(); crowd.classList.remove("instant");
+  const steps = S.mode === "seq" ? [1, 2] : [1];
+  steps.forEach((st, k) => playTimers.push(setTimeout(() => layout(st), 700 + k * 1700)));
+  playTimers.push(setTimeout(() => { played[S.mode] = true; Epi.check(); }, 700 + steps.length * 1700));
+}
+document.getElementById("playBtn").onclick = play;
+
+function bx(title, d, nd, cls) {
+  const t = d + nd;
+  return `<div class="bx ${cls || ""}"><div class="h">${title}</div><div class="c">${Epi.t("total", { t: r(t).toLocaleString() })}</div>
+    <div class="small">${Epi.t("dz", { d: `<b class="a">${r(d)}</b>`, n: `<b class="b">${r(nd)}</b>` })}</div>
+    <div class="bar"><i style="width:${(d / N) * 100}%;background:var(--a)"></i><i style="width:${(nd / N) * 100}%;background:var(--b)"></i></div></div>`;
+}
+function stage(step, sub, boxes) { return `<div class="stage"><div class="step">${step}<small>${sub}</small></div><div class="boxes">${boxes}</div></div>`; }
+
+function update() {
+  ids.forEach(k => { document.getElementById(k).value = S[k]; document.getElementById(k + "O").textContent = S[k] + "%"; });
+  document.getElementById("prevO").textContent = `${S.prev}% (${S.prev * 10})`;
+  document.querySelectorAll(".mode button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.m === S.mode)));
+  const sa = S.sa / 100, pa = S.pa / 100, sb = S.sb / 100, pb = S.pb / 100;
+  const D = N * S.prev / 100, ND = N - D;
+  let html = stage(Epi.t("pop"), Epi.t("popS"), bx(Epi.t("pop"), D, ND));
+  let tp, fp, testsA = N, testsB;
+  if (S.mode === "seq") {
+    const aTP = D * sa, aFP = ND * (1 - pa), aFN = D - aTP, aTN = ND - aFP;
+    tp = aTP * sb; fp = aFP * (1 - pb);
+    testsB = aTP + aFP;
+    html += stage(Epi.t("stA"), Epi.t("stAs"), bx(Epi.t("posA"), aTP, aFP) + bx(Epi.t("negA"), aFN, aTN, "final-neg"));
+    html += stage(Epi.t("stB"), Epi.t("stBs"), bx(Epi.t("posB"), tp, fp) + bx(Epi.t("negB"), aTP - tp, aFP - fp, "final-neg"));
+    html += stage(Epi.t("final"), "", bx(Epi.t("pos"), tp, fp, "final-pos") + bx(Epi.t("neg"), D - tp, ND - fp, "final-neg"));
+  } else {
+    tp = D * (1 - (1 - sa) * (1 - sb)); fp = ND * (1 - pa * pb);
+    testsB = N;
+    html += stage(Epi.t("stBoth"), Epi.t("stBothS"), bx(Epi.t("posA"), D * sa, ND * (1 - pa)) + bx(Epi.t("posB"), D * sb, ND * (1 - pb)));
+    html += stage(Epi.t("final"), "", bx(Epi.t("anyPos"), tp, fp, "final-pos") + bx(Epi.t("allNeg"), D - tp, ND - fp, "final-neg"));
+  }
+  document.getElementById("flow").innerHTML = html;
+
+  const netSe = tp / D, netSp = (ND - fp) / ND;
+  const row = (lab, v, col, net) => `<div class="cmp ${net ? "net" : ""}"><span>${lab}</span><div class="track"><div class="fill" style="width:${v * 100}%;background:${col}"></div></div><span class="num">${(v * 100).toFixed(1)}%</span></div>`;
+  const seqF = S.mode === "seq"
+    ? [`${(sa).toFixed(2)} × ${(sb).toFixed(2)} = ${netSe.toFixed(3)}`, `1 − (${(1 - pa).toFixed(2)} × ${(1 - pb).toFixed(2)}) = ${netSp.toFixed(3)}`]
+    : [`1 − (${(1 - sa).toFixed(2)} × ${(1 - sb).toFixed(2)}) = ${netSe.toFixed(3)}`, `${(pa).toFixed(2)} × ${(pb).toFixed(2)} = ${netSp.toFixed(3)}`];
+  document.getElementById("cmp").innerHTML =
+    `<h3>${Epi.t("netSens")}</h3>` + row(Epi.t("aAlone"), sa, "var(--rule)") + row(Epi.t("bAlone"), sb, "var(--rule)") + row(Epi.t(S.mode === "seq" ? "shSeq" : "shSim"), netSe, "var(--a)", true) +
+    `<p class="formula small">${seqF[0]} &nbsp;(${r(tp)}/${r(D)})</p>` +
+    `<h3 style="margin-top:12px">${Epi.t("netSpec")}</h3>` + row(Epi.t("aAlone"), pa, "var(--rule)") + row(Epi.t("bAlone"), pb, "var(--rule)") + row(Epi.t(S.mode === "seq" ? "shSeq" : "shSim"), netSp, "var(--b)", true) +
+    `<p class="formula small">${seqF[1]} &nbsp;(${r(ND - fp)}/${r(ND)})</p>` +
+    `<h3 style="margin-top:12px">${Epi.t("netPpv")}</h3>` + row(Epi.t(S.mode === "seq" ? "shSeq" : "shSim"), tp / (tp + fp), "var(--ink)", true);
+  lastSe = netSe; lastSp = netSp; lastPpv = tp / (tp + fp); lastTests = testsA + testsB;
+  showFinal();
+  Epi.check();
+  document.getElementById("costs").textContent = Epi.t("costs", { t: r(testsA + testsB).toLocaleString(), a: testsA.toLocaleString(), b: r(testsB).toLocaleString() });
+}
+
+ids.forEach(k => document.getElementById(k).addEventListener("input", e => { S[k] = Number(e.target.value); update(); }));
+document.querySelectorAll(".mode button").forEach(b => b.onclick = () => { S.mode = b.dataset.m; update(); });
+document.getElementById("slideBtn").onclick = () => { Object.assign(S, { prev: 20, sa: 95, pa: 90, sb: 90, pb: 95 }); update(); };
+Epi.missions("multiple-tests", document.getElementById("missions"), [
+  { id: "play", en: "Watch 100 people flow through both strategies.", zh: "看 100 個人分別走過兩種策略。", test: () => played.seq && played.sim },
+  { id: "se99", en: "Get a net sensitivity of 99% or more.", zh: "讓淨靈敏度達到 99% 以上。", test: () => lastSe >= 0.99 },
+  { id: "sp998", en: "Get a net specificity of 99.8% or more.", zh: "讓淨特異度達到 99.8% 以上。", test: () => lastSp >= 0.998 },
+  { id: "ppv", en: "Push the final positive predictive value above 99%.", zh: "讓最終的陽性預測值超過 99%。", test: () => lastPpv > 0.99 },
+  { id: "cheap", en: "Find a setting that needs fewer than 1,150 tests in total.", zh: "找出總檢測次數少於 1,150 次的設定。", test: () => lastTests < 1150 }
+]);
+Epi.loopAnim(document.getElementById("loop"), EpiLoops["multiple-tests"]);
+Epi.init(I18N, update);
+</script>
+</body>
+</html>

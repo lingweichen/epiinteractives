@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Randomize or hand-pick?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/epi.css">
+<style>
+  .zones { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  @media (max-width: 640px) { .zones { grid-template-columns: 1fr; } }
+  .zone { border: 2px dashed var(--rule); border-radius: 8px; padding: 12px; min-height: 120px; transition: border-color .15s, background .15s; }
+  .zone h3 { display: flex; justify-content: space-between; }
+  .zone.over { border-style: solid; }
+  .zone[data-zone="pool"] { background: var(--paper); }
+  .zone[data-zone="tx"] { border-color: var(--a); }
+  .zone[data-zone="tx"].over { background: var(--a-soft); }
+  .zone[data-zone="ctl"] { border-color: var(--b); }
+  .zone[data-zone="ctl"].over { background: var(--b-soft); }
+  .people { display: flex; flex-wrap: wrap; gap: 8px; min-height: 58px; }
+  .person {
+    font: inherit; position: relative; width: 56px; height: 58px; padding: 4px 0 0;
+    border: 1px solid var(--ink); border-radius: 6px; background: var(--surface); color: var(--ink);
+    cursor: grab; display: grid; place-items: center; line-height: 1.05; user-select: none;
+  }
+  .person .age { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .person .sex { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .person.dragging { cursor: grabbing; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+  .zone[data-zone="tx"] .person { background: var(--a-soft); border-color: var(--a); }
+  .zone[data-zone="ctl"] .person { background: var(--b-soft); border-color: var(--b); }
+  .reveal .person.hidden-risk::after {
+    content: ""; position: absolute; top: -6px; right: -6px; width: 14px; height: 14px;
+    background: var(--bad); border: 2px solid var(--surface); transform: rotate(45deg);
+  }
+  .diff-bar { display: inline-block; height: 8px; border-radius: 4px; background: var(--muted); vertical-align: middle; margin-left: 6px; }
+  .diff-big { color: var(--bad); font-weight: 700; }
+  .sim-row { display: grid; grid-template-columns: 100px 1fr auto; gap: 10px; align-items: center; margin: 6px 0; font-size: 14px; }
+  .sim-track { height: 16px; background: var(--paper); border-radius: 4px; overflow: hidden; }
+  .sim-fill { height: 100%; background: var(--ink); width: 0; transition: width .5s; }
+  .cols-2-1 { grid-template-columns: minmax(0, 1.25fr) minmax(360px, 1fr); }
+  @media (max-width: 900px) { .cols-2-1 { grid-template-columns: 1fr; } }
+  #balBody td, .t thead th { padding: 7px 6px; font-size: 14px; }
+  #balBody td:not(:first-child) { white-space: nowrap; }
+  .status { min-height: 1.5em; font-weight: 600; margin: 0 0 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <a class="back" href="index.html" data-i18n="back">All activities</a>
+    <div class="lang-toggle" role="group" aria-label="Language / 語言"><button data-lang="en" lang="en">English</button><button data-lang="zh" lang="zh-Hant">繁體中文</button></div>
+  </header>
+
+  <h1 data-i18n="title">Randomize or hand-pick?</h1>
+  <p class="lede" data-i18n="lede">Twenty patients join a trial. Try to build two comparable groups yourself by dragging each card into the treatment or control arm, using the sex and age you can see. Then reveal a risk factor nobody measured, and compare your groups with what randomization does.</p>
+
+  <section class="panel loop-panel" id="loop" aria-label="Animated step-by-step explainer" data-i18n-aria="loopAria"></section>
+
+  <section class="panel missions" id="missions" style="margin-bottom:20px"></section>
+
+  <div class="cols-2-1">
+    <section class="panel" aria-labelledby="alloc-h">
+      <h2 id="alloc-h" data-i18n="allocH">Allocate the patients</h2>
+      <div class="btn-row">
+        <button class="btn" id="simpleBtn" data-i18n="simple">Simple randomization</button>
+        <button class="btn" id="stratBtn" data-i18n="strat">Stratified by sex and age</button>
+        <button class="btn ghost" id="resetBtn" data-i18n="resetPool">Return all to waiting room</button>
+      </div>
+      <label class="check"><input type="checkbox" id="revealChk"> <span data-i18n="reveal">Reveal the unmeasured risk factor</span></label>
+      <p class="small" style="margin-top:6px" data-i18n="cardHint">Each card shows age and sex. Drag it into an arm, or tap it to move it along: waiting room, treatment, control.</p>
+
+      <div id="board">
+        <div class="zone" data-zone="pool">
+          <h3><span data-i18n="pool">Waiting room</span><span class="num" id="poolN"></span></h3>
+          <div class="people" id="z-pool"></div>
+        </div>
+        <div class="zones">
+          <div class="zone" data-zone="tx">
+            <h3><span class="a" data-i18n="tx">Treatment arm</span><span class="num" id="txN"></span></h3>
+            <div class="people" id="z-tx"></div>
+          </div>
+          <div class="zone" data-zone="ctl">
+            <h3><span class="b" data-i18n="ctl">Control arm</span><span class="num" id="ctlN"></span></h3>
+            <div class="people" id="z-ctl"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="stack">
+      <section class="panel" aria-labelledby="bal-h">
+        <h2 id="bal-h" data-i18n="balH">Baseline table</h2>
+        <p class="status" id="status" aria-live="polite"></p>
+        <div class="scroll-x">
+          <table class="t">
+            <thead><tr><th></th><th class="a" data-i18n="txShort">Treatment</th><th class="b" data-i18n="ctlShort">Control</th><th data-i18n="diff">Difference</th></tr></thead>
+            <tbody id="balBody"></tbody>
+          </table>
+        </div>
+        <p class="small" style="margin-top:10px" data-i18n="balNote">Like “Table 1” of a trial report: are the arms similar at baseline?</p>
+      </section>
+
+      <section class="panel" aria-labelledby="sim-h">
+        <h2 id="sim-h" data-i18n="simH">Does trial size matter?</h2>
+        <p class="small" data-i18n="simP">Randomize 1,000 trials of each size. Bars show the average gap between arms in the share of patients with the unmeasured risk factor (40% of patients have it).</p>
+        <button class="btn ghost" id="simBtn" data-i18n="simBtn">Run 1,000 trials of each size</button>
+        <div id="simOut" style="margin-top:12px"></div>
+      </section>
+    </aside>
+  </div>
+
+  <section class="notice">
+    <h2 data-i18n="notice">What to notice</h2>
+    <ul>
+      <li data-i18n="n1">Hand allocation can balance what you can see, but you can only match on variables you know about and can measure. Randomization also balances unmeasured confounders.</li>
+      <li data-i18n="n2">Randomization tends to balance both measured and unmeasured factors, but it is not a guarantee, especially in small trials.</li>
+      <li data-i18n="n3">Stratified randomization makes sure the arms are balanced on the factors you stratify on (here sex and age group); the unmeasured factor is still left to chance.</li>
+      <li data-i18n="n4">With more participants, chance imbalances shrink.</li>
+    </ul>
+  </section>
+</div>
+
+<script src="assets/epi.js"></script>
+<script src="assets/loops.js"></script>
+<script>
+const I18N = {
+  en: {
+    pageTitle: "Randomize or hand-pick?",
+    title: "Randomize or hand-pick?",
+    lede: "Twenty patients join a trial. Try to build two comparable groups yourself by dragging each card into the treatment or control arm, using the sex and age you can see. Then reveal a risk factor nobody measured, and compare your groups with what randomization does.",
+    allocH: "Allocate the patients",
+    simple: "Simple randomization",
+    strat: "Stratified by sex and age",
+    resetPool: "Return all to waiting room",
+    reveal: "Reveal the unmeasured risk factor",
+    cardHint: "Each card shows age and sex. Drag it into an arm, or tap it to move it along: waiting room, treatment, control.",
+    pool: "Waiting room", tx: "Treatment arm", ctl: "Control arm",
+    txShort: "Treatment", ctlShort: "Control", diff: "Difference",
+    balH: "Baseline table",
+    balNote: "Like “Table 1” of a trial report: are the arms similar at baseline?",
+    rowN: "Patients (n)", rowF: "Women", rowOld: "Aged 50 or older", rowAge: "Mean age (years)", rowHidden: "Unmeasured risk factor",
+    hiddenQ: "hidden", pts: "pts",
+    M: "M", F: "F",
+    stEmpty: "Drag patients into the arms to begin.",
+    stPartial: "{n} patients still in the waiting room.",
+    stDone: "All patients allocated.",
+    stSimple: "Simple randomization: a coin was tossed for each patient. Arm sizes can differ.",
+    stStrat: "Stratified randomization: patients were randomized within each sex × age-group stratum.",
+    simH: "Does trial size matter?",
+    simP: "Randomize 1,000 trials of each size. Bars show the average gap between arms in the share of patients with the unmeasured risk factor (40% of patients have it).",
+    simBtn: "Run 1,000 trials of each size",
+    simLabel: "{n} patients",
+    simFoot: "Average gap shown; 1 in 20 trials had a gap larger than: {a} (n=20), {b} (n=200), {c} (n=2,000).",
+    n1: "Hand allocation can balance what you can see, but you can only match on variables you know about and can measure. Randomization also balances unmeasured confounders.",
+    n2: "Randomization tends to balance both measured and unmeasured factors, but it is not a guarantee, especially in small trials.",
+    n3: "Stratified randomization makes sure the arms are balanced on the factors you stratify on (here sex and age group); the unmeasured factor is still left to chance.",
+    n4: "With more participants, chance imbalances shrink."
+  },
+  zh: {
+    pageTitle: "隨機分派還是自行挑選？",
+    title: "隨機分派還是自行挑選？",
+    lede: "二十位病人加入試驗。請先依照看得到的性別和年齡，自己把每張卡片拖進治療組或對照組，盡量讓兩組相似。接著揭露一個沒有被測量的風險因子，再和隨機分派的結果比較。",
+    allocH: "分派病人",
+    simple: "簡單隨機分派",
+    strat: "依性別與年齡分層隨機分派",
+    resetPool: "全部移回候診區",
+    reveal: "揭露未測量的風險因子",
+    cardHint: "每張卡片顯示年齡與性別。可拖曳到組別中，或點一下依序移動：候診區、治療組、對照組。",
+    pool: "候診區", tx: "治療組", ctl: "對照組",
+    txShort: "治療組", ctlShort: "對照組", diff: "差異",
+    balH: "基線特徵表",
+    balNote: "就像試驗報告中的 Table 1：兩組在基線時是否相似？",
+    rowN: "人數 (n)", rowF: "女性", rowOld: "50 歲以上", rowAge: "平均年齡（歲）", rowHidden: "未測量的風險因子",
+    hiddenQ: "未知", pts: "個百分點",
+    M: "男", F: "女",
+    stEmpty: "把病人拖進兩組即可開始。",
+    stPartial: "候診區還有 {n} 位病人。",
+    stDone: "所有病人皆已分派。",
+    stSimple: "簡單隨機分派：每位病人各擲一次硬幣，兩組人數可能不同。",
+    stStrat: "分層隨機分派：先依性別 × 年齡層分層，再於每一層內隨機分派。",
+    simH: "試驗規模重要嗎？",
+    simP: "每種規模各隨機分派 1,000 次。長條代表兩組間「具有未測量風險因子者比例」的平均差距（40% 的病人具有此因子）。",
+    simBtn: "每種規模各執行 1,000 次試驗",
+    simLabel: "{n} 位病人",
+    simFoot: "圖中為平均差距；每 20 次試驗中有 1 次差距大於：{a}（n=20）、{b}（n=200）、{c}（n=2,000）。",
+    n1: "自行分派可以平衡看得到的特徵，但我們只能配對已知且能測量的變項。隨機分派還能平衡未測量的干擾因子。",
+    n2: "隨機分派傾向讓已測量與未測量的因子都達到平衡，但並非保證，樣本小時尤其如此。",
+    n3: "分層隨機分派能確保兩組在分層變項（此處為性別與年齡層）上平衡；未測量的因子仍然交給機遇。",
+    n4: "參與者越多，機遇造成的不平衡就越小。"
+  }
+};
+
+// 12 men and 8 women; 8 carry an unmeasured risk factor (e.g. a genetic variant).
+const PEOPLE = [
+  ["M",34,0],["M",41,1],["M",45,0],["M",52,1],["M",58,0],["M",63,0],["M",67,1],["M",71,0],["M",29,0],["M",48,0],["M",55,1],["M",69,0],
+  ["F",31,1],["F",38,0],["F",44,0],["F",57,1],["F",61,0],["F",66,1],["F",72,0],["F",50,1]
+].map((p, i) => ({ id: i, sex: p[0], age: p[1], hidden: p[2], zone: "pool" }));
+
+const order = [7,12,3,18,0,15,9,5,19,1,14,10,4,17,8,13,2,16,11,6];
+const zoneEls = { pool: document.getElementById("z-pool"), tx: document.getElementById("z-tx"), ctl: document.getElementById("z-ctl") };
+const cardEls = {};
+let lastAction = "";
+let handMode = true;
+let rand = Math.random;
+
+function build() {
+  order.forEach(i => {
+    const p = PEOPLE[i];
+    const b = document.createElement("button");
+    b.className = "person" + (p.hidden ? " hidden-risk" : "");
+    b.dataset.id = p.id;
+    b.innerHTML = `<span class="age">${p.age}</span><span class="sex"></span>`;
+    Epi.dragToZones(b, {
+      onDrop: (el, zone) => { move(p, zone); lastAction = ""; render(); },
+      onTap: () => { move(p, { pool: "tx", tx: "ctl", ctl: "pool" }[p.zone]); lastAction = ""; render(); }
+    });
+    cardEls[p.id] = b;
+    zoneEls.pool.appendChild(b);
+  });
+}
+function move(p, zone) { p.zone = zone; zoneEls[zone].appendChild(cardEls[p.id]); }
+
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+function simpleRandomize() {
+  Epi.flip(Object.values(cardEls), () => PEOPLE.forEach(p => move(p, rand() < 0.5 ? "tx" : "ctl")), { stagger: 35 });
+  handMode = false; lastAction = "stSimple"; render();
+}
+function stratRandomize() {
+  const strata = {};
+  PEOPLE.forEach(p => { const k = p.sex + (p.age >= 50 ? "o" : "y"); (strata[k] = strata[k] || []).push(p); });
+  Epi.flip(Object.values(cardEls), () => Object.values(strata).forEach(group => {
+    const first = rand() < 0.5 ? "tx" : "ctl", second = first === "tx" ? "ctl" : "tx";
+    shuffle(group.slice()).forEach((p, i) => move(p, i % 2 === 0 ? first : second));
+  }), { stagger: 35 });
+  handMode = false; lastAction = "stStrat"; render();
+}
+
+function summarize(zone) {
+  const g = PEOPLE.filter(p => p.zone === zone);
+  const n = g.length;
+  return {
+    n,
+    f: n ? g.filter(p => p.sex === "F").length / n : NaN,
+    old: n ? g.filter(p => p.age >= 50).length / n : NaN,
+    age: n ? g.reduce((s, p) => s + p.age, 0) / n : NaN,
+    hid: n ? g.filter(p => p.hidden).length / n : NaN,
+    counts: { f: g.filter(p => p.sex === "F").length, old: g.filter(p => p.age >= 50).length, hid: g.filter(p => p.hidden).length }
+  };
+}
+
+function render() {
+  const reveal = document.getElementById("revealChk").checked;
+  document.getElementById("board").classList.toggle("reveal", reveal);
+  Object.values(cardEls).forEach(el => {
+    const p = PEOPLE[el.dataset.id];
+    el.querySelector(".sex").textContent = Epi.t(p.sex);
+    el.setAttribute("aria-label", `${Epi.t(p.sex)} ${p.age}` + (reveal && p.hidden ? ", " + Epi.t("rowHidden") : ""));
+  });
+  const tx = summarize("tx"), ctl = summarize("ctl");
+  const poolN = PEOPLE.filter(p => p.zone === "pool").length;
+  document.getElementById("poolN").textContent = poolN;
+  document.getElementById("txN").textContent = "n = " + tx.n;
+  document.getElementById("ctlN").textContent = "n = " + ctl.n;
+
+  const rows = [
+    ["rowN", tx.n, ctl.n, tx.n - ctl.n, "n"],
+    ["rowF", tx.f, ctl.f, tx.f - ctl.f, "p", tx.counts.f, ctl.counts.f],
+    ["rowOld", tx.old, ctl.old, tx.old - ctl.old, "p", tx.counts.old, ctl.counts.old],
+    ["rowAge", tx.age, ctl.age, tx.age - ctl.age, "y"],
+    ["rowHidden", tx.hid, ctl.hid, tx.hid - ctl.hid, "p", tx.counts.hid, ctl.counts.hid, true]
+  ];
+  const body = document.getElementById("balBody");
+  body.innerHTML = rows.map(r => {
+    const [key, a, b, d, kind, ca, cb, isHidden] = r;
+    const masked = isHidden && !reveal;
+    const cell = (v, c) => {
+      if (masked) return `<span class="small">${Epi.t("hiddenQ")}</span>`;
+      if (kind === "n") return v;
+      if (kind === "y") return Epi.fmt(v, 1);
+      return isFinite(v) ? `${c} (${Math.round(v * 100)}%)` : "—";
+    };
+    let diffTxt = "—", bar = "", big = false;
+    if (!masked && isFinite(d)) {
+      if (kind === "p") { diffTxt = (d > 0 ? "+" : "") + Math.round(d * 100) + " pts"; big = Math.abs(d) >= 0.2; bar = Math.min(60, Math.abs(d) * 150); }
+      else if (kind === "y") { diffTxt = (d > 0 ? "+" : "") + Epi.fmt(d, 1); big = Math.abs(d) >= 5; bar = Math.min(60, Math.abs(d) * 4); }
+      else { diffTxt = (d > 0 ? "+" : "") + d; }
+    }
+    if (masked) diffTxt = "?";
+    diffTxt = diffTxt.replace(" pts", " " + Epi.t("pts"));
+    return `<tr><td>${Epi.t(key)}</td><td>${cell(a, ca)}</td><td>${cell(b, cb)}</td><td class="${big ? "diff-big" : ""}">${diffTxt}${bar ? `<span class="diff-bar" style="width:${bar}px;${big ? "background:var(--bad)" : ""}"></span>` : ""}</td></tr>`;
+  }).join("");
+
+  const st = document.getElementById("status");
+  if (lastAction) st.textContent = Epi.t(lastAction);
+  else if (poolN === 20) st.textContent = Epi.t("stEmpty");
+  else if (poolN > 0) st.textContent = Epi.t("stPartial", { n: poolN });
+  else st.textContent = Epi.t("stDone");
+  if (simResult) drawSim();
+  Epi.check();
+}
+
+let simResult = null;
+function runSim() {
+  const sizes = [20, 200, 2000];
+  simResult = sizes.map(n => {
+    const gaps = [];
+    for (let t = 0; t < 1000; t++) {
+      let nt = 0, nc = 0, ht = 0, hc = 0;
+      for (let i = 0; i < n; i++) {
+        const h = Math.random() < 0.4, toT = Math.random() < 0.5;
+        if (toT) { nt++; if (h) ht++; } else { nc++; if (h) hc++; }
+      }
+      if (nt && nc) gaps.push(Math.abs(ht / nt - hc / nc));
+    }
+    gaps.sort((x, y) => x - y);
+    return { n, mean: gaps.reduce((s, g) => s + g, 0) / gaps.length, p95: gaps[Math.floor(gaps.length * 0.95)] };
+  });
+  drawSim();
+}
+function drawSim() {
+  const max = Math.max(...simResult.map(r => r.mean));
+  const out = document.getElementById("simOut");
+  out.innerHTML = simResult.map(r => `
+    <div class="sim-row"><span>${Epi.t("simLabel", { n: r.n.toLocaleString() })}</span>
+    <div class="sim-track"><div class="sim-fill" data-w="${(r.mean / max) * 100}"></div></div>
+    <span class="num">${(r.mean * 100).toFixed(1)} ${Epi.t("pts")}</span></div>`).join("") +
+    `<p class="small" style="margin-top:8px">${Epi.t("simFoot", { a: (simResult[0].p95 * 100).toFixed(0) + "%", b: (simResult[1].p95 * 100).toFixed(0) + "%", c: (simResult[2].p95 * 100).toFixed(0) + "%" })}</p>`;
+  requestAnimationFrame(() => out.querySelectorAll(".sim-fill").forEach(f => f.style.width = f.dataset.w + "%"));
+  Epi.check();
+}
+
+build();
+const poolEmpty = () => PEOPLE.every(p => p.zone !== "pool");
+const cnt = (z, f) => PEOPLE.filter(p => p.zone === z && f(p)).length;
+Epi.missions("randomization", document.getElementById("missions"), [
+  { id: "hand", en: "Allocate all 20 patients by hand.", zh: "親手分派全部 20 位病人。", test: () => handMode && poolEmpty() },
+  { id: "bal", en: "By hand, give both arms the same number of women <i>and</i> of patients aged 50+.", zh: "親手讓兩組的女性人數<i>以及</i> 50 歲以上人數都相同。",
+    test: () => handMode && poolEmpty() && cnt("tx", p => p.sex === "F") === cnt("ctl", p => p.sex === "F") && cnt("tx", p => p.age >= 50) === cnt("ctl", p => p.age >= 50) },
+  { id: "rev", en: "Reveal the unmeasured risk factor after a hand allocation. Was it balanced too?", zh: "親手分派後揭露未測量的風險因子。它也平衡了嗎？", test: () => handMode && poolEmpty() && document.getElementById("revealChk").checked },
+  { id: "strat", en: "Watch a stratified randomization.", zh: "觀看一次分層隨機分派。", test: () => lastAction === "stStrat" },
+  { id: "sim", en: "Run 1,000 trials of each size.", zh: "每種規模各執行 1,000 次試驗。", test: () => simResult !== null }
+]);
+document.getElementById("simpleBtn").onclick = simpleRandomize;
+document.getElementById("stratBtn").onclick = stratRandomize;
+document.getElementById("resetBtn").onclick = () => {
+  Epi.flip(Object.values(cardEls), () => { PEOPLE.forEach(p => move(p, "pool")); order.forEach(i => zoneEls.pool.appendChild(cardEls[i])); }, { stagger: 15 });
+  handMode = true; lastAction = ""; render();
+};
+document.getElementById("revealChk").onchange = render;
+document.getElementById("simBtn").onclick = runSim;
+Epi.loopAnim(document.getElementById("loop"), EpiLoops["randomization"]);
+Epi.init(I18N, render);
+</script>
+</body>
+</html>

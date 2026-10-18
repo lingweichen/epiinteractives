@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cutoffs, prevalence and predictive values</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/epi.css">
+<style>
+  svg { width: 100%; height: auto; display: block; }
+  .axis { stroke: var(--muted); stroke-width: 1; }
+  .tick { fill: var(--muted); font-size: 13px; }
+  #dist .tick { font-size: 17px; }
+  .two { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  .two th, .two td { border: 1px solid var(--rule); padding: 8px; text-align: center; }
+  .two th { font-size: 13px; color: var(--muted); font-weight: 600; }
+  .two td.cell { font-size: 20px; font-weight: 800; }
+  .two td.cell small { display: block; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .two td.tp { background: var(--a-soft); color: var(--a); }
+  .two td.fn { color: var(--a); }
+  .two td.fp { background: var(--b-soft); color: var(--b); }
+  .two td.tn { color: var(--b); }
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+  .metric { border-top: 3px solid var(--ink); padding-top: 8px; }
+  .metric .name { font-weight: 700; font-size: 14px; }
+  .metric .name small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+  .metric .val { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.15; }
+  .metric .f { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .metric .q { font-size: 13px; margin-top: 4px; }
+  .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+  .seg button { font: inherit; font-size: 14px; border: 0; padding: 6px 12px; background: transparent; color: var(--muted); cursor: pointer; font-variant-numeric: tabular-nums; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px 24px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <a class="back" href="index.html" data-i18n="back">All activities</a>
+    <div class="lang-toggle" role="group" aria-label="Language / 語言"><button data-lang="en" lang="en">English</button><button data-lang="zh" lang="zh-Hant">繁體中文</button></div>
+  </header>
+
+  <h1 data-i18n="title">Cutoffs, prevalence and predictive values</h1>
+  <p class="lede" data-i18n="lede">A test measures some value, and everyone above the cutoff is called positive. Drag the cutoff to trade sensitivity against specificity, then change the prevalence and watch the predictive values move while sensitivity and specificity stay put.</p>
+
+  <section class="panel loop-panel" id="loop" aria-label="Animated step-by-step explainer" data-i18n-aria="loopAria"></section>
+
+  <section class="panel missions" id="missions" style="margin-bottom:20px"></section>
+
+  <div class="cols-2-1">
+    <section class="panel">
+      <h2 data-i18n="distH">Test values in the population</h2>
+      <svg id="dist" viewBox="0 0 720 330" role="img" aria-labelledby="distDesc"><desc id="distDesc" data-i18n="distDesc">Distributions of test values in people with and without the disease, with a draggable cutoff line.</desc></svg>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--a)"></i><span data-i18n="lgTP">True positive (TP)</span></span>
+        <span><i class="sw" style="background:var(--a-soft);border:1px solid var(--a)"></i><span data-i18n="lgFN">False negative (FN)</span></span>
+        <span><i class="sw" style="background:var(--b)"></i><span data-i18n="lgFP">False positive (FP)</span></span>
+        <span><i class="sw" style="background:var(--b-soft);border:1px solid var(--b)"></i><span data-i18n="lgTN">True negative (TN)</span></span>
+      </div>
+      <div class="controls">
+        <div class="field">
+          <label for="cut"><span data-i18n="cutL">Cutoff (positive if at or above)</span><output id="cutO"></output></label>
+          <input type="range" id="cut" min="20" max="85" step="0.5">
+        </div>
+        <div class="field">
+          <label for="prev"><span data-i18n="prevL">Prevalence</span><output id="prevO"></output></label>
+          <input type="range" id="prev" min="0" max="1000" step="1">
+        </div>
+      </div>
+      <div class="btn-row" id="presets"></div>
+      <div style="display:flex;flex-wrap:wrap;gap:18px;align-items:center">
+        <div><span class="small" data-i18n="popL">Population screened</span>&nbsp;
+          <span class="seg" id="nSeg"><button data-n="1000">1,000</button><button data-n="10000">10,000</button><button data-n="100000">100,000</button></span></div>
+        <label class="check"><input type="checkbox" id="scaleChk" checked> <span data-i18n="scaleL">Draw curve heights by number of people</span></label>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <h2 data-i18n="tabH">2 × 2 table</h2>
+      <div class="scroll-x">
+        <table class="two">
+          <thead><tr><th></th><th data-i18n="hDis">Disease</th><th data-i18n="hNoDis">No disease</th><th data-i18n="hTot">Total</th></tr></thead>
+          <tbody>
+            <tr><th data-i18n="hPos">Test +</th><td class="cell tp"><span id="tp"></span><small data-i18n="sTP">TP 真陽性</small></td><td class="cell fp"><span id="fp"></span><small data-i18n="sFP">FP 偽陽性</small></td><td id="pos" class="num"></td></tr>
+            <tr><th data-i18n="hNeg">Test −</th><td class="cell fn"><span id="fn"></span><small data-i18n="sFN">FN 偽陰性</small></td><td class="cell tn"><span id="tn"></span><small data-i18n="sTN">TN 真陰性</small></td><td id="neg" class="num"></td></tr>
+            <tr><th data-i18n="hTot">Total</th><td id="dis" class="num"></td><td id="nodis" class="num"></td><td id="tot" class="num"></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="metrics">
+        <div class="metric"><div class="name"><span data-i18n="mSens">Sensitivity</span><small data-i18n="mSensZ">靈敏度 · true positive rate</small></div><div class="val" id="sens"></div><div class="f" id="fSens"></div></div>
+        <div class="metric"><div class="name"><span data-i18n="mSpec">Specificity</span><small data-i18n="mSpecZ">特異度 · true negative rate</small></div><div class="val" id="spec"></div><div class="f" id="fSpec"></div></div>
+        <div class="metric"><div class="name"><span data-i18n="mPpv">Positive predictive value</span><small data-i18n="mPpvZ">陽性預測值</small></div><div class="val" id="ppv"></div><div class="f" id="fPpv"></div><div class="q" data-i18n="qPpv">If the test is positive, how likely is disease?</div></div>
+        <div class="metric"><div class="name"><span data-i18n="mNpv">Negative predictive value</span><small data-i18n="mNpvZ">陰性預測值</small></div><div class="val" id="npv"></div><div class="f" id="fNpv"></div><div class="q" data-i18n="qNpv">If the test is negative, how likely is no disease?</div></div>
+      </div>
+    </aside>
+  </div>
+
+  <section class="panel" style="margin-top:20px">
+    <div class="cols">
+      <div>
+        <h2 data-i18n="curveH">Predictive values depend on prevalence</h2>
+        <p class="small" data-i18n="curveP">The curves use the current sensitivity and specificity. Drag the dot along the curve to change the prevalence.</p>
+        <p id="curveRead" class="formula" aria-live="polite"></p>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--a)"></i><span data-i18n="mPpv">Positive predictive value</span></span>
+          <span><i class="sw" style="background:var(--b)"></i><span data-i18n="mNpv">Negative predictive value</span></span>
+        </div>
+      </div>
+      <svg id="curve" viewBox="0 0 460 260" role="img" aria-label="PPV and NPV versus prevalence"></svg>
+    </div>
+  </section>
+
+  <section class="panel" style="margin-top:20px">
+    <h2 data-i18n="iconH">Every person, one square</h2>
+    <p class="small" data-i18n="iconP">1,000 people tested at the current cutoff and prevalence. Each square is one person, coloured as in the 2 × 2 table.</p>
+    <label class="check" style="margin:6px 0 12px"><input type="checkbox" id="posOnly"> <span data-i18n="posOnly">Show only the people who test positive</span></label>
+    <canvas id="icons" style="width:100%;display:block" role="img" aria-label="Icon array of 1,000 people"></canvas>
+    <p id="iconRead" class="formula" style="margin-top:12px" aria-live="polite"></p>
+  </section>
+
+  <section class="panel game" data-challenge style="margin-top:20px">
+    <h2 data-i18n="gameH">Game: guess the PPV</h2>
+    <p class="small" data-i18n="gameP">Most people, including many doctors, overestimate this. Guess first, then check. Getting within 10 percentage points counts as a hit.</p>
+    <div id="game"></div>
+  </section>
+
+  <section class="notice">
+    <h2 data-i18n="notice">What to notice</h2>
+    <ul>
+      <li data-i18n="n1">Moving the cutoff to the left catches more cases (sensitivity up) but mislabels more healthy people (specificity down). There is no cutoff that improves both.</li>
+      <li data-i18n="n2">Sensitivity and specificity are properties of the test. Predictive values also depend on how common the disease is in the people tested.</li>
+      <li data-i18n="n3">Try prevalence 1%: even a good test gives mostly false positives. This is why screening a low-risk population produces many false alarms, and why the same test performs better in a high-risk clinic.</li>
+    </ul>
+  </section>
+</div>
+
+<script src="assets/epi.js"></script>
+<script src="assets/loops.js"></script>
+<script>
+const MU0 = 40, MU1 = 61, SD = 10;   // no disease / disease
+const I18N = {
+  en: {
+    pageTitle: "Cutoffs, prevalence and predictive values", title: "Cutoffs, prevalence and predictive values",
+    lede: "A test measures some value, and everyone above the cutoff is called positive. Drag the cutoff to trade sensitivity against specificity, then change the prevalence and watch the predictive values move while sensitivity and specificity stay put.",
+    distH: "Test values in the population",
+    lgTP: "True positive (TP)", lgFN: "False negative (FN)", lgFP: "False positive (FP)", lgTN: "True negative (TN)",
+    cutL: "Cutoff (positive if at or above)", prevL: "Prevalence", popL: "Population screened", scaleL: "Draw curve heights by number of people",
+    pSlide: "Office hour example (prevalence 10%)", pPop: "Screening the general population (1%)", pClinic: "High-risk clinic (30%)",
+    axis: "Test value", neg: "Test −", pos: "Test +", cutTag: "cutoff {c}", withD: "With disease", withoutD: "Without disease",
+    tabH: "2 × 2 table", hDis: "Disease", hNoDis: "No disease", hTot: "Total", hPos: "Test +", hNeg: "Test −",
+    sTP: "TP", sFP: "FP", sFN: "FN", sTN: "TN",
+    mSens: "Sensitivity", mSensZ: "true positive rate", mSpec: "Specificity", mSpecZ: "true negative rate",
+    mPpv: "Positive predictive value", mPpvZ: "PPV", mNpv: "Negative predictive value", mNpvZ: "NPV",
+    qPpv: "If the test is positive, how likely is disease?", qNpv: "If the test is negative, how likely is no disease?",
+    curveH: "Predictive values depend on prevalence",
+    curveP: "The curves use the current sensitivity and specificity. Drag the dot along the curve to change the prevalence.",
+    curveRead: "At prevalence {p}: of every 100 positive results, about {k} are true positives.",
+    xPrev: "Prevalence (log scale)",
+    distDesc: "Distributions of test values in people with and without the disease, with a draggable cutoff line.",
+    gameH: "Game: guess the PPV", gameP: "Most people, including many doctors, overestimate this. Guess first, then check. Getting within 10 percentage points counts as a hit.",
+    gq: "Prevalence <b>{p}</b>, sensitivity <b>{se}</b>, specificity <b>{sp}</b>. A person tests <b>positive</b>. What is the chance they really have the disease?",
+    gx: "Out of 10,000 people, {d} have the disease and {tp} of them test positive. {nd} do not, yet {fp} of them also test positive. So PPV = {tp} ÷ ({tp} + {fp}) = <b>{ppv}</b>.",
+    gLabel: "Your guess for the PPV",
+    iconH: "Every person, one square", iconP: "1,000 people tested at the current cutoff and prevalence. Each square is one person, coloured as in the 2 × 2 table.",
+    posOnly: "Show only the people who test positive",
+    iconRead: "Of the <b>{pos}</b> people who test positive, <b class=\"a\">{tp}</b> have the disease and <b class=\"b\">{fp}</b> do not. A positive result is right {k} times in 100.",
+    iconReadAll: "<b class=\"a\">{tp}</b> true positives, <b class=\"a\">{fn}</b> false negatives, <b class=\"b\">{fp}</b> false positives, <b class=\"b\">{tn}</b> true negatives.",
+    n1: "Moving the cutoff to the left catches more cases (sensitivity up) but mislabels more healthy people (specificity down). There is no cutoff that improves both.",
+    n2: "Sensitivity and specificity are properties of the test. Predictive values also depend on how common the disease is in the people tested.",
+    n3: "Try prevalence 1%: even a good test gives mostly false positives. This is why screening a low-risk population produces many false alarms, and why the same test performs better in a high-risk clinic."
+  },
+  zh: {
+    pageTitle: "切點、盛行率與預測值", title: "切點、盛行率與預測值",
+    lede: "檢測會量到某個數值，高於切點者判定為陽性。拖曳切點，觀察靈敏度與特異度之間的取捨；再調整盛行率，看預測值如何變動，而靈敏度與特異度維持不變。",
+    distH: "族群中的檢測數值",
+    lgTP: "真陽性（TP）", lgFN: "偽陰性（FN）", lgFP: "偽陽性（FP）", lgTN: "真陰性（TN）",
+    cutL: "切點（大於或等於即為陽性）", prevL: "盛行率", popL: "受檢人數", scaleL: "曲線高度依人數繪製",
+    pSlide: "課堂範例（盛行率 10%）", pPop: "一般族群篩檢（1%）", pClinic: "高風險門診（30%）",
+    axis: "檢測數值", neg: "檢測 −", pos: "檢測 +", cutTag: "切點 {c}", withD: "有病者", withoutD: "無病者",
+    tabH: "2 × 2 表", hDis: "有病", hNoDis: "無病", hTot: "合計", hPos: "檢測 +", hNeg: "檢測 −",
+    sTP: "真陽性", sFP: "偽陽性", sFN: "偽陰性", sTN: "真陰性",
+    mSens: "靈敏度", mSensZ: "真陽性率", mSpec: "特異度", mSpecZ: "真陰性率",
+    mPpv: "陽性預測值", mPpvZ: "PPV", mNpv: "陰性預測值", mNpvZ: "NPV",
+    qPpv: "檢測陽性時，真的有病的機率有多高？", qNpv: "檢測陰性時，真的沒病的機率有多高？",
+    curveH: "預測值取決於盛行率",
+    curveP: "曲線使用目前的靈敏度與特異度。沿著曲線拖曳圓點即可改變盛行率。",
+    curveRead: "盛行率 {p} 時：每 100 個陽性結果中，約有 {k} 個是真陽性。",
+    xPrev: "盛行率（對數尺度）",
+    distDesc: "有病者與無病者的檢測數值分布，以及可拖曳的切點線。",
+    gameH: "遊戲：猜猜陽性預測值", gameP: "大多數人（包括許多醫師）都會高估它。先猜，再看答案。誤差在 10 個百分點以內就算猜中。",
+    gq: "盛行率 <b>{p}</b>、靈敏度 <b>{se}</b>、特異度 <b>{sp}</b>。某人檢測結果為<b>陽性</b>，他真的有病的機率是多少？",
+    gx: "在 10,000 人中，{d} 人有病，其中 {tp} 人檢測陽性；{nd} 人沒有病，卻也有 {fp} 人檢測陽性。因此 PPV = {tp} ÷（{tp} + {fp}）= <b>{ppv}</b>。",
+    gLabel: "你猜的陽性預測值",
+    iconH: "每一個人，一個方格", iconP: "在目前切點與盛行率下檢測 1,000 人。每個方格代表一個人，顏色與 2 × 2 表相同。",
+    posOnly: "只顯示檢測陽性的人",
+    iconRead: "在 <b>{pos}</b> 位檢測陽性者中，<b class=\"a\">{tp}</b> 位真的有病，<b class=\"b\">{fp}</b> 位沒有病。每 100 個陽性結果中約有 {k} 個是對的。",
+    iconReadAll: "真陽性 <b class=\"a\">{tp}</b>、偽陰性 <b class=\"a\">{fn}</b>、偽陽性 <b class=\"b\">{fp}</b>、真陰性 <b class=\"b\">{tn}</b>。",
+    n1: "把切點往左移可抓到更多病例（靈敏度上升），但也會把更多健康的人誤判為陽性（特異度下降）。沒有任何切點能讓兩者同時提升。",
+    n2: "靈敏度與特異度是檢測本身的特性；預測值則還取決於受檢族群中疾病有多常見。",
+    n3: "試試盛行率 1%：即使檢測很好，陽性結果仍多半是偽陽性。這就是為何在低風險族群篩檢會產生許多假警報，而同一檢測在高風險門診表現較好。"
+  }
+};
+
+// ---------- maths ----------
+function erf(x) { const s = Math.sign(x); x = Math.abs(x); const t = 1 / (1 + 0.3275911 * x);
+  const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return s * y; }
+const Phi = z => 0.5 * (1 + erf(z / Math.SQRT2));
+const pdf = (x, m) => Math.exp(-0.5 * ((x - m) / SD) ** 2) / (SD * Math.sqrt(2 * Math.PI));
+const PMIN = 0.001, PMAX = 0.5;
+const sliderToPrev = v => PMIN * Math.pow(PMAX / PMIN, v / 1000);
+const prevToSlider = p => Math.round(1000 * Math.log(p / PMIN) / Math.log(PMAX / PMIN));
+
+const S = { cut: 52.5, prev: 0.1, N: 10000, scale: true };
+
+// ---------- distribution chart ----------
+const dist = document.getElementById("dist");
+const X0 = 50, X1 = 700, YB = 280, YT = 46;
+const xs = v => X0 + (v / 100) * (X1 - X0);
+const xv = px => ((px - X0) / (X1 - X0)) * 100;
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || dist).appendChild(e); return e; }
+
+const gAreas = el("g", {});
+const gAxis = el("g", {});
+const cutG = el("g", {});
+const cutLine = el("line", { y1: 30, y2: YB, stroke: "var(--ink)", "stroke-width": 2 }, cutG);
+const cutHit = el("rect", { y: 22, height: YB - 22, width: 30, fill: "transparent" }, cutG);
+const cutKnob = el("circle", { cy: 30, r: 10, fill: "var(--ink)", class: "ring", stroke: "var(--surface)", "stroke-width": 2 }, cutG);
+const cutTxt = el("text", { y: 14, "text-anchor": "middle", "font-size": 18, "font-weight": 700, fill: "var(--ink)" }, cutG);
+const negTxt = el("text", { y: 64, "text-anchor": "end", "font-size": 16, fill: "var(--muted)" });
+const posTxt = el("text", { y: 64, "font-size": 16, fill: "var(--muted)" });
+const lab0 = el("text", { "text-anchor": "middle", "font-size": 17, "font-weight": 700, fill: "var(--b)" });
+const lab1 = el("text", { "text-anchor": "middle", "font-size": 17, "font-weight": 700, fill: "var(--a)" });
+
+function drawAxis() {
+  gAxis.innerHTML = "";
+  el("line", { x1: X0, x2: X1, y1: YB, y2: YB, class: "axis" }, gAxis);
+  for (let v = 0; v <= 100; v += 10) {
+    el("line", { x1: xs(v), x2: xs(v), y1: YB, y2: YB + 5, class: "axis" }, gAxis);
+    el("text", { x: xs(v), y: YB + 20, "text-anchor": "middle", class: "tick" }, gAxis).textContent = v;
+  }
+  el("text", { x: (X0 + X1) / 2, y: YB + 46, "text-anchor": "middle", class: "tick" }, gAxis).textContent = Epi.t("axis");
+}
+
+function areaPath(m, h, from, to) {
+  let d = `M${xs(from)},${YB}`;
+  for (let v = from; v <= to + 1e-9; v += 0.5) d += `L${xs(v).toFixed(1)},${(YB - pdf(v, m) * h).toFixed(1)}`;
+  return d + `L${xs(to)},${YB}Z`;
+}
+function linePath(m, h) {
+  let d = "";
+  for (let v = 0; v <= 100; v += 0.5) d += (v ? "L" : "M") + xs(v).toFixed(1) + "," + (YB - pdf(v, m) * h).toFixed(1);
+  return d;
+}
+function drawDist() {
+  const nD = S.prev * S.N, nND = S.N - nD, peak = pdf(0, 0);
+  let h0, h1;
+  if (S.scale) { const k = (YB - YT) / (Math.max(nD, nND) * peak); h0 = nND * k; h1 = nD * k; }
+  else { h0 = h1 = (YB - YT) / peak; }
+  const c = S.cut;
+  gAreas.innerHTML = "";
+  el("path", { d: areaPath(MU0, h0, 0, c), fill: "var(--b-soft)", opacity: 0.9 }, gAreas);
+  el("path", { d: areaPath(MU0, h0, c, 100), fill: "var(--b)", opacity: 0.8 }, gAreas);
+  el("path", { d: areaPath(MU1, h1, 0, c), fill: "var(--a-soft)", opacity: 0.85 }, gAreas);
+  el("path", { d: areaPath(MU1, h1, c, 100), fill: "var(--a)", opacity: 0.75 }, gAreas);
+  el("path", { d: linePath(MU0, h0), fill: "none", stroke: "var(--b)", "stroke-width": 2 }, gAreas);
+  el("path", { d: linePath(MU1, h1), fill: "none", stroke: "var(--a)", "stroke-width": 2 }, gAreas);
+  const x = xs(c);
+  cutLine.setAttribute("x1", x); cutLine.setAttribute("x2", x);
+  cutHit.setAttribute("x", x - 15); cutKnob.setAttribute("cx", x);
+  cutTxt.setAttribute("x", x); cutTxt.textContent = Epi.t("cutTag", { c: c.toFixed(1) });
+  negTxt.setAttribute("x", x - 10); negTxt.textContent = Epi.t("neg");
+  posTxt.setAttribute("x", x + 10); posTxt.textContent = Epi.t("pos");
+  lab0.setAttribute("x", xs(MU0)); lab0.setAttribute("y", Math.max(YT - 6, YB - pdf(MU0, MU0) * h0 - 8)); lab0.textContent = Epi.t("withoutD");
+  lab1.setAttribute("x", xs(MU1 + 6)); lab1.setAttribute("y", Math.max(YT + 8, YB - pdf(MU1, MU1) * h1 - 8)); lab1.textContent = Epi.t("withD");
+  cutG.setAttribute("aria-valuenow", c); cutG.setAttribute("aria-valuetext", c.toFixed(1));
+  cutG.setAttribute("aria-label", Epi.t("cutL"));
+}
+Epi.svgHandle(cutG, { svg: dist, toValue: px => Math.round(xv(px) * 2) / 2, getValue: () => S.cut, step: 0.5, onChange: v => setCut(v) });
+
+// ---------- PPV curve ----------
+const cv = document.getElementById("curve");
+const CX0 = 50, CX1 = 440, CY0 = 220, CY1 = 14;
+const lx = p => CX0 + (Math.log(p / PMIN) / Math.log(PMAX / PMIN)) * (CX1 - CX0);
+const lp = px => PMIN * Math.pow(PMAX / PMIN, (px - CX0) / (CX1 - CX0));
+const ly = v => CY0 - v * (CY0 - CY1);
+function cel(tag, a, p) { return el(tag, a, p || cv); }
+const cAxis = cel("g", {}), cLines = cel("g", {});
+const mk = cel("g", {});
+const mkV = cel("line", { stroke: "var(--muted)", "stroke-dasharray": "3 3" }, mk);
+const mkDot = cel("circle", { r: 9, fill: "var(--a)", stroke: "var(--surface)", "stroke-width": 2, class: "ring" }, mk);
+const mkDot2 = cel("circle", { r: 5, fill: "var(--b)" }, mk);
+const mkHit = cel("rect", { width: 30, y: CY1, height: CY0 - CY1, fill: "transparent" }, mk);
+Epi.svgHandle(mk, { svg: cv, toValue: px => Epi.clamp(prevToSlider(lp(Epi.clamp(px, CX0, CX1))), 0, 1000), getValue: () => prevToSlider(S.prev), step: 10, onChange: v => setPrev(sliderToPrev(Epi.clamp(v, 0, 1000))) });
+
+function drawCurveAxis() {
+  cAxis.innerHTML = "";
+  cel("line", { x1: CX0, x2: CX1, y1: CY0, y2: CY0, class: "axis" }, cAxis);
+  cel("line", { x1: CX0, x2: CX0, y1: CY0, y2: CY1, class: "axis" }, cAxis);
+  [0.001, 0.01, 0.1, 0.5].forEach(p => {
+    cel("line", { x1: lx(p), x2: lx(p), y1: CY0, y2: CY0 + 5, class: "axis" }, cAxis);
+    cel("text", { x: lx(p), y: CY0 + 18, "text-anchor": "middle", class: "tick" }, cAxis).textContent = (p * 100) + "%";
+  });
+  [0, 0.25, 0.5, 0.75, 1].forEach(v => {
+    cel("line", { x1: CX0, x2: CX1, y1: ly(v), y2: ly(v), stroke: "var(--rule)" }, cAxis);
+    cel("text", { x: CX0 - 8, y: ly(v) + 4, "text-anchor": "end", class: "tick" }, cAxis).textContent = v.toFixed(2);
+  });
+  cel("text", { x: (CX0 + CX1) / 2, y: CY0 + 36, "text-anchor": "middle", class: "tick" }, cAxis).textContent = Epi.t("xPrev");
+}
+function ppvAt(p, se, sp) { return se * p / (se * p + (1 - sp) * (1 - p)); }
+function npvAt(p, se, sp) { return sp * (1 - p) / (sp * (1 - p) + (1 - se) * p); }
+function drawCurve(se, sp) {
+  cLines.innerHTML = "";
+  let d1 = "", d2 = "";
+  for (let i = 0; i <= 200; i++) {
+    const p = PMIN * Math.pow(PMAX / PMIN, i / 200);
+    d1 += (i ? "L" : "M") + lx(p).toFixed(1) + "," + ly(ppvAt(p, se, sp)).toFixed(1);
+    d2 += (i ? "L" : "M") + lx(p).toFixed(1) + "," + ly(npvAt(p, se, sp)).toFixed(1);
+  }
+  cel("path", { d: d2, fill: "none", stroke: "var(--b)", "stroke-width": 2.5, "stroke-dasharray": "6 4" }, cLines);
+  cel("path", { d: d1, fill: "none", stroke: "var(--a)", "stroke-width": 3 }, cLines);
+  const x = lx(S.prev), v = ppvAt(S.prev, se, sp);
+  mkV.setAttribute("x1", x); mkV.setAttribute("x2", x); mkV.setAttribute("y1", CY0); mkV.setAttribute("y2", CY1);
+  mkDot.setAttribute("cx", x); mkDot.setAttribute("cy", ly(v));
+  mkDot2.setAttribute("cx", x); mkDot2.setAttribute("cy", ly(npvAt(S.prev, se, sp)));
+  mkHit.setAttribute("x", x - 15);
+  mk.setAttribute("aria-label", Epi.t("prevL")); mk.setAttribute("aria-valuetext", Epi.pct(S.prev));
+  document.getElementById("curveRead").textContent = Epi.t("curveRead", { p: fmtPrev(S.prev), k: Math.round(v * 100) });
+}
+
+// ---------- table & metrics ----------
+const fmtPrev = p => (p < 0.01 ? (p * 100).toFixed(2) : p < 0.1 ? (p * 100).toFixed(1) : (p * 100).toFixed(0)) + "%";
+const n = x => Math.round(x).toLocaleString();
+function update() {
+  const se = 1 - Phi((S.cut - MU1) / SD), sp = Phi((S.cut - MU0) / SD);
+  const D = Math.round(S.N * S.prev), ND = S.N - D;
+  const TP = Math.round(D * se), FN = D - TP, TN = Math.round(ND * sp), FP = ND - TN;
+  const set = (id, v) => document.getElementById(id).textContent = v;
+  set("tp", n(TP)); set("fn", n(FN)); set("fp", n(FP)); set("tn", n(TN));
+  set("pos", n(TP + FP)); set("neg", n(FN + TN)); set("dis", n(D)); set("nodis", n(ND)); set("tot", n(S.N));
+  set("sens", Epi.fmt(TP / D, 2)); set("fSens", `TP/(TP+FN) = ${n(TP)}/${n(D)}`);
+  set("spec", Epi.fmt(TN / ND, 2)); set("fSpec", `TN/(TN+FP) = ${n(TN)}/${n(ND)}`);
+  set("ppv", Epi.fmt(TP / (TP + FP), 2)); set("fPpv", `TP/(TP+FP) = ${n(TP)}/${n(TP + FP)}`);
+  set("npv", Epi.fmt(TN / (TN + FN), 2)); set("fNpv", `TN/(TN+FN) = ${n(TN)}/${n(TN + FN)}`);
+  document.getElementById("cut").value = S.cut;
+  document.getElementById("cutO").textContent = S.cut.toFixed(1);
+  document.getElementById("prev").value = prevToSlider(S.prev);
+  document.getElementById("prevO").textContent = fmtPrev(S.prev);
+  document.querySelectorAll("#nSeg button").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.n) === S.N)));
+  drawDist(); drawCurve(se, sp); drawIcons(se, sp);
+  lastSe = TP / D; lastPpv = TP / (TP + FP);
+  Epi.check();
+}
+let lastSe = 0, lastPpv = 0, game = null;
+const pick = a => a[Math.floor(Math.random() * a.length)];
+function gameRound() {
+  const p = pick([0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.4]), se = pick([0.8, 0.85, 0.9, 0.95, 0.99]), sp = pick([0.85, 0.9, 0.95, 0.98, 0.99]);
+  const d = Math.round(10000 * p), tp = Math.round(d * se), nd = 10000 - d, fp = Math.round(nd * (1 - sp));
+  const ans = Math.round(1000 * tp / (tp + fp)) / 10;
+  const pc = x => (x * 100 < 1 ? (x * 100).toFixed(1) : Math.round(x * 100)) + "%";
+  return {
+    answer: ans,
+    q: () => Epi.t("gq", { p: pc(p), se: pc(se), sp: pc(sp) }),
+    explain: () => Epi.t("gx", { d: d.toLocaleString(), tp: tp.toLocaleString(), nd: nd.toLocaleString(), fp: fp.toLocaleString(), ppv: ans.toFixed(1) + "%" })
+  };
+}
+
+// ---------- icon array ----------
+const icv = document.getElementById("icons");
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function drawIcons(se, sp) {
+  const D = Math.round(1000 * S.prev), ND = 1000 - D;
+  const TP = Math.round(D * se), FN = D - TP, TN = Math.round(ND * sp), FP = ND - TN;
+  const posOnly = document.getElementById("posOnly").checked;
+  const cols = icv.clientWidth < 520 ? 25 : 50, rows = 1000 / cols;
+  const w = icv.clientWidth, cell = w / cols, h = cell * rows, dpr = window.devicePixelRatio || 1;
+  if (!w) return;
+  icv.width = Math.round(w * dpr); icv.height = Math.round(h * dpr); icv.style.height = h + "px";
+  const ctx = icv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  const A = cssVar("--a"), As = cssVar("--a-soft"), B = cssVar("--b"), Bs = cssVar("--b-soft");
+  const kinds = [[TP, A, A, 1], [FN, As, A, posOnly ? 0.12 : 1], [FP, B, B, 1], [TN, Bs, B, posOnly ? 0.12 : 1]];
+  let i = 0;
+  const g = Math.max(1, cell * 0.16), r = Math.min(3, cell * 0.2);
+  kinds.forEach(([n, fill, stroke, alpha]) => {
+    for (let k = 0; k < n; k++, i++) {
+      const x = (i % cols) * cell + g / 2, y = Math.floor(i / cols) * cell + g / 2, s = cell - g;
+      ctx.globalAlpha = alpha; ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, s, s, r) : ctx.rect(x, y, s, s); ctx.fill();
+      if (fill !== stroke) ctx.stroke();
+    }
+  });
+  ctx.globalAlpha = 1;
+  document.getElementById("iconRead").innerHTML = posOnly
+    ? Epi.t("iconRead", { pos: TP + FP, tp: TP, fp: FP, k: TP + FP ? Math.round(100 * TP / (TP + FP)) : "—" })
+    : Epi.t("iconReadAll", { tp: TP, fn: FN, fp: FP, tn: TN });
+}
+document.getElementById("posOnly").onchange = update;
+window.addEventListener("resize", () => { if (document.getElementById("icons")) update(); });
+function setCut(v) { S.cut = Epi.clamp(v, 20, 85); update(); }
+function setPrev(p) { S.prev = Epi.clamp(p, PMIN, PMAX); update(); }
+
+function renderStatic() {
+  drawAxis(); drawCurveAxis();
+  const box = document.getElementById("presets");
+  box.innerHTML = [["pSlide", 0.1, 52.5], ["pPop", 0.01], ["pClinic", 0.3]]
+    .map(([k, p, c]) => `<button class="btn ghost" data-p="${p}" ${c ? `data-c="${c}"` : ""}>${Epi.t(k)}</button>`).join("");
+  box.querySelectorAll("button").forEach(b => b.onclick = () => { if (b.dataset.c) S.cut = Number(b.dataset.c); setPrev(Number(b.dataset.p)); });
+  update();
+}
+
+document.getElementById("cut").addEventListener("input", e => setCut(Number(e.target.value)));
+document.getElementById("prev").addEventListener("input", e => setPrev(sliderToPrev(Number(e.target.value))));
+document.querySelectorAll("#nSeg button").forEach(b => b.onclick = () => { S.N = Number(b.dataset.n); update(); });
+document.getElementById("scaleChk").onchange = e => { S.scale = e.target.checked; update(); };
+game = Epi.guessGame(document.getElementById("game"), { min: 0, max: 100, step: 1, start: 50, tol: 10, fmt: v => Math.round(v * 10) / 10 + "%", round: gameRound, label: "gLabel" });
+Epi.missions("diagnostic", document.getElementById("missions"), [
+  { id: "se95", en: "Drag the cutoff until sensitivity is at least 0.95. What happens to specificity?", zh: "拖曳切點，直到靈敏度至少 0.95。特異度怎麼了？", test: () => lastSe >= 0.95 },
+  { id: "ppv90", en: "Get the positive predictive value above 0.90.", zh: "讓陽性預測值超過 0.90。", test: () => lastPpv > 0.9 },
+  { id: "low", en: "Set prevalence to 1% or less and show only the people who test positive.", zh: "把盛行率設在 1% 以下，並只顯示檢測陽性的人。", test: () => S.prev <= 0.0101 && document.getElementById("posOnly").checked },
+  { id: "game", en: "Game: guess the PPV within 10 points in 3 rounds.", zh: "遊戲：猜中陽性預測值（誤差 10 個百分點內）3 次。", test: () => game && game.hits >= 3 }
+]);
+Epi.loopAnim(document.getElementById("loop"), EpiLoops["diagnostic"]);
+Epi.init(I18N, () => { renderStatic(); if (game) game.render(); });
+</script>
+</body>
+</html>

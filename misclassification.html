@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Non-differential vs. differential misclassification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/epi.css">
+<style>
+  svg { width: 100%; height: auto; display: block; }
+  .tick { fill: var(--muted); font-size: 19px; }
+  .grp { border-top: 3px solid var(--ink); padding-top: 10px; margin-top: 14px; }
+  .grp.cases { border-color: var(--bad); }
+  .grp.ctrls { border-color: var(--muted); }
+  .grp h3 small { font-weight: 400; color: var(--muted); }
+  .pbar { display: grid; grid-template-columns: 140px 1fr 56px; gap: 10px; align-items: center; font-size: 14px; margin: 6px 0; }
+  .pbar .track { height: 18px; background: var(--paper); border-radius: 4px; overflow: hidden; }
+  .pbar .fill { height: 100%; transition: width .2s; }
+  .verdict { font-size: 18px; font-weight: 700; margin: 8px 0 0; }
+  .chg { font-size: 12px; font-weight: 700; display: block; }
+  .chg.up { color: var(--bad); } .chg.down { color: var(--a); }
+  .ortxt { font-weight: 800; font-size: 21px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <a class="back" href="index.html" data-i18n="back">All activities</a>
+    <div class="lang-toggle" role="group" aria-label="Language / 語言"><button data-lang="en" lang="en">English</button><button data-lang="zh" lang="zh-Hant">繁體中文</button></div>
+  </header>
+
+  <h1 data-i18n="title">Non-differential vs. differential misclassification</h1>
+  <p class="lede" data-i18n="lede">A case-control study of lawn and garden pesticide use and breast cancer. The true odds ratio is 1.29. Make the exposure questionnaire less accurate, in cases, controls or both, and watch where the observed odds ratio goes.</p>
+
+  <section class="panel loop-panel" id="loop" aria-label="Animated step-by-step explainer" data-i18n-aria="loopAria"></section>
+
+  <section class="panel missions" id="missions" style="margin-bottom:20px"></section>
+
+  <div class="cols-2-1">
+    <section class="panel">
+      <h2 data-i18n="orH">Observed vs. true odds ratio</h2>
+      <svg id="orsvg" viewBox="0 0 720 200" role="img" aria-label="Odds ratio on a log scale"></svg>
+      <p class="verdict" id="verdict" aria-live="polite"></p>
+
+      <h2 style="margin-top:20px" data-i18n="pctH">Share classified as ever exposed</h2>
+      <div id="pct"></div>
+
+      <h2 style="margin-top:20px" data-i18n="tabH">True and observed counts</h2>
+      <div class="scroll-x">
+        <table class="t" id="tab"></table>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <h2 data-i18n="setH">How accurate is the exposure measurement?</h2>
+      <div class="btn-row" id="presets"></div>
+      <label class="check"><input type="checkbox" id="link" checked> <span data-i18n="linkL">Same accuracy in cases and controls (non-differential)</span></label>
+      <div class="grp cases">
+        <h3><span data-i18n="cases">Cases</span> <small data-i18n="casesS">(breast cancer +)</small></h3>
+        <div class="field"><label for="seCa"><span data-i18n="se">Sensitivity: ever-users reported as ever</span><output id="seCaO"></output></label><input type="range" id="seCa" min="50" max="100" step="1"></div>
+        <div class="field"><label for="spCa"><span data-i18n="sp">Specificity: never-users reported as never</span><output id="spCaO"></output></label><input type="range" id="spCa" min="50" max="100" step="1"></div>
+      </div>
+      <div class="grp ctrls">
+        <h3><span data-i18n="ctrls">Controls</span> <small data-i18n="ctrlsS">(breast cancer −)</small></h3>
+        <div class="field"><label for="seCo"><span data-i18n="se">Sensitivity: ever-users reported as ever</span><output id="seCoO"></output></label><input type="range" id="seCo" min="50" max="100" step="1"></div>
+        <div class="field"><label for="spCo"><span data-i18n="sp">Specificity: never-users reported as never</span><output id="spCoO"></output></label><input type="range" id="spCo" min="50" max="100" step="1"></div>
+      </div>
+    </aside>
+  </div>
+
+  <section class="notice">
+    <h2 data-i18n="notice">What to notice</h2>
+    <ul>
+      <li data-i18n="n1">Non-differential: exposure is misclassified equally in cases and controls (for example, a common pesticide left off the questionnaire). With a binary exposure, the odds ratio is pulled towards the null (1.0), so estimates are usually more conservative.</li>
+      <li data-i18n="n2">Differential: misclassification is related to disease status, for example recall bias (cases search their memory harder) or interviewer bias. The bias can go in either direction, away from or towards the null.</li>
+      <li data-i18n="n3">Lowering specificity in cases only (cases over-report use) reproduces the office hour example: the odds ratio rises from 1.29 to 1.36.</li>
+    </ul>
+  </section>
+</div>
+
+<script src="assets/epi.js"></script>
+<script src="assets/loops.js"></script>
+<script>
+const TRUTH = { caE: 1254, caU: 240, coE: 1231, coU: 305 };
+const PRE = {
+  truth: [100, 100, 100, 100],
+  nondiff: [87, 100, 87, 100],
+  recall: [100, 96, 100, 100],
+  under: [100, 100, 80, 100]
+};
+const S = { seCa: 87, spCa: 100, seCo: 87, spCo: 100 };
+let lastOR = NaN, lastDiff = false;
+const I18N = {
+  en: {
+    pageTitle: "Non-differential vs. differential misclassification", title: "Non-differential vs. differential misclassification",
+    lede: "A case-control study of lawn and garden pesticide use and breast cancer. The true odds ratio is 1.29. Make the exposure questionnaire less accurate, in cases, controls or both, and watch where the observed odds ratio goes.",
+    orH: "Observed vs. true odds ratio", pctH: "Share classified as ever exposed", tabH: "True and observed counts",
+    setH: "How accurate is the exposure measurement?",
+    pTruth: "Perfect measurement", pNon: "Non-differential (slide 59)", pRecall: "Recall bias: cases over-report (slide 60)", pUnder: "Controls under-report",
+    linkL: "Same accuracy in cases and controls (non-differential)",
+    cases: "Cases", casesS: "(breast cancer +)", ctrls: "Controls", ctrlsS: "(breast cancer −)",
+    se: "Sensitivity: ever-users reported as ever", sp: "Specificity: never-users reported as never",
+    nul: "null", truthL: "truth {v}", obsL: "observed {v}",
+    vSame: "No misclassification: the observed odds ratio equals the truth.",
+    vToward: "Biased towards the null: {t} became {o}.",
+    vAway: "Biased away from the null: {t} became {o}.",
+    vCross: "The bias crossed the null: {t} became {o}, now suggesting the opposite effect.",
+    kNon: "Non-differential", kDiff: "Differential",
+    trueCa: "Cases, true", obsCa: "Cases, observed", trueCo: "Controls, true", obsCo: "Controls, observed",
+    th0: "", thCa: "Breast cancer +", thCo: "Breast cancer −",
+    ever: "Ever used pesticides", never: "Never used pesticides", orRow: "Odds ratio", trueW: "true", obsW: "observed",
+    n1: "Non-differential: exposure is misclassified equally in cases and controls (for example, a common pesticide left off the questionnaire). With a binary exposure, the odds ratio is pulled towards the null (1.0), so estimates are usually more conservative.",
+    n2: "Differential: misclassification is related to disease status, for example recall bias (cases search their memory harder) or interviewer bias. The bias can go in either direction, away from or towards the null.",
+    n3: "Lowering specificity in cases only (cases over-report use) reproduces the office hour example: the odds ratio rises from 1.29 to 1.36."
+  },
+  zh: {
+    pageTitle: "非差異性與差異性錯誤分類", title: "非差異性與差異性錯誤分類",
+    lede: "一項探討庭院農藥使用與乳癌的病例對照研究，真實的勝算比為 1.29。讓曝露問卷變得不準確（在病例組、對照組或兩組），觀察所觀察到的勝算比往哪裡移動。",
+    orH: "觀察勝算比與真實勝算比", pctH: "被歸類為「曾經曝露」的比例", tabH: "真實與觀察到的人數",
+    setH: "曝露測量有多準確？",
+    pTruth: "完美測量", pNon: "非差異性（投影片 59）", pRecall: "回憶偏差：病例多報（投影片 60）", pUnder: "對照組少報",
+    linkL: "病例組與對照組準確度相同（非差異性）",
+    cases: "病例組", casesS: "（乳癌 +）", ctrls: "對照組", ctrlsS: "（乳癌 −）",
+    se: "靈敏度：曾使用者被記錄為曾使用", sp: "特異度：未使用者被記錄為未使用",
+    nul: "虛無值", truthL: "真實 {v}", obsL: "觀察 {v}",
+    vSame: "沒有錯誤分類：觀察勝算比等於真實值。",
+    vToward: "偏向虛無值：{t} 變成 {o}。",
+    vAway: "偏離虛無值：{t} 變成 {o}。",
+    vCross: "偏差越過虛無值：{t} 變成 {o}，結論方向因此相反。",
+    kNon: "非差異性", kDiff: "差異性",
+    trueCa: "病例組，真實", obsCa: "病例組，觀察", trueCo: "對照組，真實", obsCo: "對照組，觀察",
+    th0: "", thCa: "乳癌 +", thCo: "乳癌 −",
+    ever: "曾使用農藥", never: "從未使用農藥", orRow: "勝算比", trueW: "真實", obsW: "觀察",
+    n1: "非差異性：病例組與對照組的曝露被同等錯誤分類（例如問卷漏列一種常見農藥）。在二元曝露下，勝算比會被拉向虛無值（1.0），因此估計通常較保守。",
+    n2: "差異性：錯誤分類與疾病狀態有關，例如回憶偏差（病例更努力回想）或訪談者偏差。偏差方向可能偏離或偏向虛無值。",
+    n3: "只降低病例組的特異度（病例多報使用）即可重現課堂範例：勝算比由 1.29 上升到 1.36。"
+  }
+};
+
+const NS = "http://www.w3.org/2000/svg";
+const svg = document.getElementById("orsvg");
+function mk(tag, a, p) { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); (p || svg).appendChild(e); return e; }
+const OMIN = 0.5, OMAX = 3, X0 = 30, X1 = 690, Y = 125;
+const ox = v => X0 + (Math.log(Epi.clamp(v, OMIN, OMAX) / OMIN) / Math.log(OMAX / OMIN)) * (X1 - X0);
+
+function observe() {
+  const caE = S.seCa / 100 * TRUTH.caE + (1 - S.spCa / 100) * TRUTH.caU;
+  const coE = S.seCo / 100 * TRUTH.coE + (1 - S.spCo / 100) * TRUTH.coU;
+  return { caE, caU: TRUTH.caE + TRUTH.caU - caE, coE, coU: TRUTH.coE + TRUTH.coU - coE };
+}
+const orOf = t => (t.caE / t.caU) / (t.coE / t.coU);
+
+function drawOR(tor, oor) {
+  svg.innerHTML = "";
+  mk("defs", {}).innerHTML = `<marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--bad)"/></marker>`;
+  mk("line", { x1: X0, x2: X1, y1: Y, y2: Y, stroke: "var(--muted)" });
+  [0.5, 0.75, 1, 1.25, 1.5, 2, 3].forEach(v => {
+    mk("line", { x1: ox(v), x2: ox(v), y1: Y, y2: Y + 6, stroke: "var(--muted)" });
+    mk("text", { x: ox(v), y: Y + 30, "text-anchor": "middle", class: "tick" }).textContent = v;
+  });
+  mk("line", { x1: ox(1), x2: ox(1), y1: 40, y2: Y, stroke: "var(--ink)", "stroke-width": 2, "stroke-dasharray": "4 4" });
+  mk("text", { x: ox(1), y: 28, "text-anchor": "middle", class: "tick" }).textContent = Epi.t("nul") + " 1.0";
+  mk("text", { x: (X0 + X1) / 2, y: Y + 60, "text-anchor": "middle", class: "tick" }).textContent = "OR (log)";
+  const moved = Math.abs(oor - tor) > 0.004, right = oor > tor;
+  if (moved) {
+    mk("line", { x1: ox(tor), x2: ox(oor) + (right ? -11 : 11), y1: Y, y2: Y, stroke: "var(--bad)", "stroke-width": 4, "marker-end": "url(#arr)" });
+    mk("circle", { cx: ox(oor), cy: Y, r: 9, fill: "var(--bad)" });
+    mk("text", { x: ox(oor) + (right ? 6 : -6), y: Y - 22, "text-anchor": right ? "start" : "end", class: "ortxt", fill: "var(--bad)" }).textContent = Epi.t("obsL", { v: oor.toFixed(2) });
+  }
+  mk("circle", { cx: ox(tor), cy: Y, r: 9, fill: "var(--surface)", stroke: "var(--ink)", "stroke-width": 3 });
+  mk("text", { x: ox(tor) + (moved ? (right ? -6 : 6) : 0), y: Y - 22, "text-anchor": moved ? (right ? "end" : "start") : "middle", class: "ortxt", fill: "var(--ink)" }).textContent = Epi.t("truthL", { v: tor.toFixed(2) });
+}
+
+function update() {
+  ["seCa", "spCa", "seCo", "spCo"].forEach(k => { document.getElementById(k).value = S[k]; document.getElementById(k + "O").textContent = S[k] + "%"; });
+  const o = observe(), tor = orOf(TRUTH), oor = orOf(o);
+  drawOR(tor, oor);
+  const diff = !(S.seCa === S.seCo && S.spCa === S.spCo);
+  const v = document.getElementById("verdict");
+  const t2 = tor.toFixed(2), o2 = oor.toFixed(2);
+  let key = "vSame";
+  if (t2 !== o2) {
+    if ((oor - 1) * (tor - 1) < 0) key = "vCross";
+    else key = Math.abs(Math.log(oor)) < Math.abs(Math.log(tor)) ? "vToward" : "vAway";
+  }
+  v.innerHTML = (key === "vSame" ? "" : `<span class="small" style="display:block;font-weight:600">${Epi.t(diff ? "kDiff" : "kNon")}</span>`) + Epi.t(key, { t: t2, o: o2 });
+  v.className = "verdict " + (key === "vSame" ? "" : key === "vToward" ? "a" : "bad");
+
+  lastOR = oor; lastDiff = diff; Epi.check();
+  const pc = (e, u) => e / (e + u);
+  const bar = (lab, p, col) => `<div class="pbar"><span>${lab}</span><div class="track"><div class="fill" style="width:${p * 100}%;background:${col}"></div></div><span class="num">${Math.round(p * 100)}%</span></div>`;
+  document.getElementById("pct").innerHTML =
+    bar(Epi.t("trueCa"), pc(TRUTH.caE, TRUTH.caU), "var(--rule)") + bar(Epi.t("obsCa"), pc(o.caE, o.caU), "var(--bad)") +
+    bar(Epi.t("trueCo"), pc(TRUTH.coE, TRUTH.coU), "var(--rule)") + bar(Epi.t("obsCo"), pc(o.coE, o.coU), "var(--muted)");
+
+  const r = Math.round;
+  const cell = (tv, ov) => { const d = r(ov) - tv; return `${r(ov).toLocaleString()} <span class="small">(${Epi.t("trueW")} ${tv.toLocaleString()})</span>${d ? `<span class="chg ${d > 0 ? "up" : "down"}">${d > 0 ? "+" : ""}${d}</span>` : ""}`; };
+  document.getElementById("tab").innerHTML =
+    `<thead><tr><th></th><th>${Epi.t("thCa")}</th><th>${Epi.t("thCo")}</th></tr></thead><tbody>
+     <tr><td>${Epi.t("ever")}</td><td>${cell(TRUTH.caE, o.caE)}</td><td>${cell(TRUTH.coE, o.coE)}</td></tr>
+     <tr><td>${Epi.t("never")}</td><td>${cell(TRUTH.caU, o.caU)}</td><td>${cell(TRUTH.coU, o.coU)}</td></tr>
+     <tr><td>${Epi.t("orRow")}</td><td colspan="2" style="text-align:center"><b>${o2}</b> <span class="small">(${Epi.t("trueW")} ${t2})</span></td></tr></tbody>`;
+}
+
+function renderPresets() {
+  const box = document.getElementById("presets");
+  box.innerHTML = [["truth", "pTruth"], ["nondiff", "pNon"], ["recall", "pRecall"], ["under", "pUnder"]]
+    .map(([k, l]) => `<button class="btn ghost" data-k="${k}">${Epi.t(l)}</button>`).join("");
+  box.querySelectorAll("button").forEach(b => b.onclick = () => {
+    const v = PRE[b.dataset.k];
+    [S.seCa, S.spCa, S.seCo, S.spCo] = v;
+    document.getElementById("link").checked = v[0] === v[2] && v[1] === v[3];
+    update();
+  });
+}
+["seCa", "spCa", "seCo", "spCo"].forEach(k => document.getElementById(k).addEventListener("input", e => {
+  S[k] = Number(e.target.value);
+  if (document.getElementById("link").checked) {
+    const twin = { seCa: "seCo", seCo: "seCa", spCa: "spCo", spCo: "spCa" }[k];
+    S[twin] = S[k];
+  }
+  update();
+}));
+document.getElementById("link").onchange = e => { if (e.target.checked) { S.seCo = S.seCa; S.spCo = S.spCa; } update(); };
+Epi.missions("misclassification", document.getElementById("missions"), [
+  { id: "nd110", en: "With non-differential misclassification only, pull the odds ratio below 1.10.", zh: "只用非差異性錯誤分類，把勝算比拉到 1.10 以下。", test: () => !lastDiff && lastOR < 1.1 },
+  { id: "away", en: "Push the odds ratio above 1.60, away from the null.", zh: "把勝算比推到 1.60 以上，偏離虛無值。", test: () => lastOR > 1.6 },
+  { id: "cross", en: "Make the observed odds ratio cross the null: pesticides now look protective.", zh: "讓觀察勝算比越過虛無值：農藥看起來變成有保護作用。", test: () => lastOR < 1 },
+  { id: "s60", en: "Reproduce the office hour recall-bias result: OR = 1.36 with differential misclassification.", zh: "重現課堂的回憶偏差結果：差異性錯誤分類下 OR = 1.36。", test: () => lastDiff && lastOR.toFixed(2) === "1.36" }
+]);
+Epi.loopAnim(document.getElementById("loop"), EpiLoops["misclassification"]);
+Epi.init(I18N, () => { renderPresets(); update(); });
+</script>
+</body>
+</html>

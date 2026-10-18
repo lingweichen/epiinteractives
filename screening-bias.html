@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lead-time and length-time bias</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/epi.css">
+<style>
+  svg { width: 100%; height: auto; display: block; }
+  .axis { stroke: var(--muted); }
+  .tick { fill: var(--muted); font-size: 14px; }
+  .lane-lab { fill: var(--ink); font-size: 15px; font-weight: 700; }
+  .hlab { font-size: 14px; font-weight: 700; fill: var(--ink); }
+  .verdict { font-size: 18px; font-weight: 700; margin: 12px 0 0; }
+  .yn { font-weight: 700; }
+  .opts { display: grid; gap: 8px; margin: 12px 0; }
+  .opt { font: inherit; text-align: left; padding: 9px 12px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); cursor: pointer; }
+  .opt.right { border-color: var(--good); border-width: 2px; }
+  .opt.wrong { border-color: var(--bad); border-width: 2px; }
+  .odrow { display: grid; grid-template-columns: 170px 1fr; gap: 12px; align-items: center; margin: 14px 0; }
+  @media (max-width: 600px) { .odrow { grid-template-columns: 1fr; } }
+  .odrow .lab { font-weight: 700; font-size: 15px; }
+  .odrow .lab small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; }
+  .odbar { display: flex; height: 34px; border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); }
+  .odbar i { display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 13px; font-weight: 700; overflow: hidden; white-space: nowrap; transition: width .2s; }
+  .life { display: flex; flex-wrap: wrap; gap: 10px; min-height: 40px; }
+  .life span { padding: 6px 12px; border-radius: 999px; background: var(--paper); font-weight: 600; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .life span.dx { background: var(--a-soft); color: var(--a); }
+  .life span.dead { background: var(--ink); color: var(--paper); }
+  .lt-read { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 10px; }
+  .lt-read .big { font-size: 30px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <a class="back" href="index.html" data-i18n="back">All activities</a>
+    <div class="lang-toggle" role="group" aria-label="Language / 語言"><button data-lang="en" lang="en">English</button><button data-lang="zh" lang="zh-Hant">繁體中文</button></div>
+  </header>
+
+  <h1 data-i18n="title">Lead-time, length-time and over-diagnosis bias</h1>
+  <p class="lede" data-i18n="lede">Screening can make survival look better even when it changes nothing. Drag the points on the timelines to see how.</p>
+
+  <section class="panel loop-panel" id="loop" aria-label="Animated step-by-step explainer" data-i18n-aria="loopAria"></section>
+
+  <section class="panel missions" id="missions" style="margin-bottom:20px"></section>
+
+  <section class="panel">
+    <h2 data-i18n="ltH">Lead time: one patient, two diagnoses</h2>
+    <p class="small" data-i18n="ltP">Drag the round handles. Screening can only find the disease during the detectable preclinical phase, before symptoms appear.</p>
+    <div class="btn-row" style="align-items:center;margin-top:10px">
+      <button class="btn play" id="lifeBtn" data-i18n="lifeBtn">Play this patient's life</button>
+      <label class="check"><input type="checkbox" id="benefit"> <span data-i18n="benefitL">Early treatment delays death</span></label>
+    </div>
+    <div id="lifeStatus" class="life" aria-live="polite"></div>
+    <svg id="lt" viewBox="0 0 740 300" role="group" aria-label="Lead time timeline"></svg>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--rule)"></i><span data-i18n="lgPre">Preclinical, not yet detectable</span></span>
+      <span><i class="sw" style="background:var(--b)"></i><span data-i18n="lgDet">Detectable preclinical phase</span></span>
+      <span><i class="sw" style="background:var(--a)"></i><span data-i18n="lgSurv">Survival after usual (clinical) diagnosis</span></span>
+      <span><i class="sw" style="background:repeating-linear-gradient(45deg,var(--b),var(--b) 3px,var(--surface) 3px,var(--surface) 6px)"></i><span data-i18n="lgLead">Lead time</span></span>
+    </div>
+    <div class="scroll-x" style="margin-top:14px">
+      <table class="t" style="max-width:640px">
+        <thead><tr><th></th><th data-i18n="noScr">Not screened</th><th data-i18n="scr">Screened</th></tr></thead>
+        <tbody id="ltBody"></tbody>
+      </table>
+    </div>
+    <p class="verdict" id="verdict" aria-live="polite"></p>
+  </section>
+
+  <section class="panel" style="margin-top:20px">
+    <h2 data-i18n="lenH">Length time: which tumours does a screening round catch?</h2>
+    <p class="small" data-i18n="lenP">Each bar is one tumour's detectable preclinical phase. Slow-growing tumours stay detectable for a long time; fast-growing ones only briefly. Drag the screening day across the timeline.</p>
+    <svg id="len" viewBox="0 0 740 300" role="group" aria-label="Length time illustration"></svg>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--a)"></i><span data-i18n="lgSlow">Slow-growing (better prognosis)</span></span>
+      <span><i class="sw" style="background:var(--bad)"></i><span data-i18n="lgFast">Fast-growing (worse prognosis)</span></span>
+    </div>
+    <div class="lt-read">
+      <div><div class="small" data-i18n="allShare">Slow-growing among all tumours</div><div class="big" id="allShare"></div></div>
+      <div><div class="small" data-i18n="detShare">Slow-growing among screen-detected tumours</div><div class="big a" id="detShare"></div></div>
+      <div><div class="small" data-i18n="detN">Detected on this screening day</div><div class="big" id="detN"></div></div>
+    </div>
+  </section>
+
+  <section class="panel" style="margin-top:20px">
+    <h2 data-i18n="odH">Over-diagnosis: survival improves, deaths do not</h2>
+    <p class="small" data-i18n="odP">1,000 people have clinical lung cancer; after 10 years 900 have died. Screening also labels people as having cancer who would never have been harmed by it. Drag the slider to add them.</p>
+    <div class="field" style="max-width:520px"><label for="od"><span data-i18n="odL">Over-diagnosed people added by screening</span><output id="odO"></output></label><input type="range" id="od" min="0" max="5000" step="100"></div>
+    <div id="odBars"></div>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--ink)"></i><span data-i18n="lgDead">Died within 10 years</span></span>
+      <span><i class="sw" style="background:var(--a)"></i><span data-i18n="lgAlive">Clinical cancer, alive at 10 years</span></span>
+      <span><i class="sw" style="background:var(--a-soft);border:1px solid var(--a)"></i><span data-i18n="lgOd">Over-diagnosed, alive at 10 years</span></span>
+    </div>
+    <p class="verdict" id="odVerdict" aria-live="polite"></p>
+  </section>
+
+  <section class="panel" data-challenge style="margin-top:20px">
+    <h2 data-i18n="quizH">Quiz</h2>
+    <p data-i18n="quizQ">For a screening programme and early treatment of those who screen positive to be truly effective, there should be:</p>
+    <div class="opts" id="opts"></div>
+    <p id="quizFb" aria-live="polite"></p>
+  </section>
+
+  <section class="notice">
+    <h2 data-i18n="notice">What to notice</h2>
+    <ul>
+      <li data-i18n="n1">With early treatment switched off, the screened patient “survives” longer after diagnosis and passes the 5-year mark, yet dies on the same day. Screening added disease time, not life.</li>
+      <li data-i18n="n2">Screening is truly effective only if survival of the screened is longer than lead time plus the survival of the unscreened, which means death is actually delayed. Compare mortality, not survival from diagnosis.</li>
+      <li data-i18n="n4">Over-diagnosis adds people who were never going to die of the disease, inflating survival among those diagnosed while deaths stay the same.</li>
+      <li data-i18n="n3">A screening round preferentially picks up slow-growing tumours, which have a better prognosis anyway (length-time bias). A randomized trial counting all outcomes in both arms avoids both biases.</li>
+    </ul>
+  </section>
+</div>
+
+<script src="assets/epi.js"></script>
+<script src="assets/loops.js"></script>
+<script>
+const I18N = {
+  en: {
+    pageTitle: "Lead-time, length-time and over-diagnosis bias", title: "Lead-time, length-time and over-diagnosis bias",
+    lede: "Screening can make survival look better even when it changes nothing. Drag the points on the timelines to see how.",
+    ltH: "Lead time: one patient, two diagnoses",
+    ltP: "Drag the round handles. Screening can only find the disease during the detectable preclinical phase, before symptoms appear.",
+    benefitL: "Early treatment delays death", lifeBtn: "Play this patient's life",
+    lsYear: "Year {t}", lsNone: "{who}: no diagnosis yet", lsDx: "{who}: living with diagnosis for {y} y", lsDead: "{who}: died {y} y after diagnosis",
+    lgPre: "Preclinical, not yet detectable", lgDet: "Detectable preclinical phase", lgSurv: "Survival after usual (clinical) diagnosis", lgLead: "Lead time",
+    laneNat: "Natural history", laneNo: "Not screened", laneScr: "Screened",
+    hOnset: "Biological onset", hDet: "Detectable", hSym: "Symptoms", hDeath: "Death", hScr: "Screen +", hDeath2: "Death",
+    years: "Years since biological onset",
+    noScr: "Not screened", scr: "Screened",
+    rDx: "Diagnosed at year", rDeath: "Dies at year", rSurv: "Survival after diagnosis", rFive: "Alive 5 years after diagnosis?",
+    yes: "Yes", no: "No", yr: "{v} y",
+    vNone: "Screened survival looks {d} years longer, but death is not delayed at all: the whole gain is lead time.",
+    vReal: "Death is delayed by {g} years: a real benefit. Of the {d}-year apparent gain, {l} years is lead time.",
+    vZero: "Screening on the day symptoms appear gives no lead time.",
+    lenH: "Length time: which tumours does a screening round catch?",
+    lenP: "Each bar is one tumour's detectable preclinical phase. Slow-growing tumours stay detectable for a long time; fast-growing ones only briefly. Drag the screening day across the timeline.",
+    lgSlow: "Slow-growing (better prognosis)", lgFast: "Fast-growing (worse prognosis)",
+    allShare: "Slow-growing among all tumours", detShare: "Slow-growing among screen-detected tumours", detN: "Detected on this screening day",
+    screenDay: "Screening day", time: "Calendar time",
+    odH: "Over-diagnosis: survival improves, deaths do not",
+    odP: "1,000 people have clinical lung cancer; after 10 years 900 have died. Screening also labels people as having cancer who would never have been harmed by it. Drag the slider to add them.",
+    odL: "Over-diagnosed people added by screening",
+    lgDead: "Died within 10 years", lgAlive: "Clinical cancer, alive at 10 years", lgOd: "Over-diagnosed, alive at 10 years",
+    od1: "No screening", od2: "Screening", odSurv: "10-year survival {p}", odN: "{n} diagnosed",
+    odV: "10-year survival rises from 10% to {p}, yet exactly the same 900 people die. Use mortality, not survival among the diagnosed.",
+    odV0: "With no over-diagnosis, survival is 10% in both scenarios.",
+    quizH: "Quiz",
+    quizQ: "For a screening programme and early treatment of those who screen positive to be truly effective, there should be:",
+    qA: "Greater apparent survival time of those screened than those not screened",
+    qB: "Greater survival time of those screened than the survival time + lead time of those not screened",
+    qC: "Delayed death for those screened compared with those not screened",
+    qD: "A and C", qE: "B and C",
+    qRight: "Correct. Survival must exceed lead time plus the survival of the unscreened, which is the same as saying death is delayed.",
+    qWrong: "Not quite. A longer apparent survival can be produced by lead time alone, with no delay in death. Try the timeline above with early treatment switched off.",
+    n1: "With early treatment switched off, the screened patient “survives” longer after diagnosis and passes the 5-year mark, yet dies on the same day. Screening added disease time, not life.",
+    n2: "Screening is truly effective only if survival of the screened is longer than lead time plus the survival of the unscreened, which means death is actually delayed. Compare mortality, not survival from diagnosis.",
+    n4: "Over-diagnosis adds people who were never going to die of the disease, inflating survival among those diagnosed while deaths stay the same.",
+    n3: "A screening round preferentially picks up slow-growing tumours, which have a better prognosis anyway (length-time bias). A randomized trial counting all outcomes in both arms avoids both biases."
+  },
+  zh: {
+    pageTitle: "領先時間、病程長度與過度診斷偏差", title: "領先時間、病程長度與過度診斷偏差",
+    lede: "即使篩檢什麼都沒改變，存活看起來仍可能變好。拖曳時間軸上的點，看看原因。",
+    ltH: "領先時間：同一位病人，兩種診斷時間點",
+    ltP: "拖曳圓形控制點。篩檢只能在症狀出現前的「可偵測臨床前期」發現疾病。",
+    benefitL: "早期治療能延後死亡", lifeBtn: "播放這位病人的一生",
+    lsYear: "第 {t} 年", lsNone: "{who}：尚未診斷", lsDx: "{who}：診斷後已 {y} 年", lsDead: "{who}：診斷後 {y} 年死亡",
+    lgPre: "臨床前期，尚無法偵測", lgDet: "可偵測臨床前期", lgSurv: "一般（臨床）診斷後的存活時間", lgLead: "領先時間",
+    laneNat: "疾病自然史", laneNo: "未篩檢", laneScr: "有篩檢",
+    hOnset: "生物學起始", hDet: "可偵測", hSym: "出現症狀", hDeath: "死亡", hScr: "篩檢陽性", hDeath2: "死亡",
+    years: "自生物學起始後的年數",
+    noScr: "未篩檢", scr: "有篩檢",
+    rDx: "診斷時間（年）", rDeath: "死亡時間（年）", rSurv: "診斷後存活時間", rFive: "診斷後存活滿 5 年？",
+    yes: "是", no: "否", yr: "{v} 年",
+    vNone: "有篩檢者的存活時間看起來多了 {d} 年，但死亡完全沒有延後：增加的全部都是領先時間。",
+    vReal: "死亡延後了 {g} 年：這是真正的效益。在看起來多出的 {d} 年中，有 {l} 年是領先時間。",
+    vZero: "在症狀出現當天篩檢，不會產生領先時間。",
+    lenH: "病程長度：一次篩檢會抓到哪些腫瘤？",
+    lenP: "每一條代表一顆腫瘤的可偵測臨床前期。生長緩慢的腫瘤可被偵測的時間很長；生長快速的只有很短的時間。沿時間軸拖曳篩檢日。",
+    lgSlow: "生長緩慢（預後較佳）", lgFast: "生長快速（預後較差）",
+    allShare: "所有腫瘤中生長緩慢者比例", detShare: "篩檢偵測到的腫瘤中生長緩慢者比例", detN: "此篩檢日偵測到的數量",
+    screenDay: "篩檢日", time: "日曆時間",
+    odH: "過度診斷：存活率提升，死亡人數不變",
+    odP: "1,000 人罹患臨床肺癌，10 年後有 900 人死亡。篩檢也會把一些「一輩子都不會因此受害」的人診斷為癌症。拖曳滑桿把他們加進來。",
+    odL: "篩檢額外造成的過度診斷人數",
+    lgDead: "10 年內死亡", lgAlive: "臨床癌症，10 年後仍存活", lgOd: "過度診斷，10 年後仍存活",
+    od1: "未篩檢", od2: "有篩檢", odSurv: "10 年存活率 {p}", odN: "診斷 {n} 人",
+    odV: "10 年存活率由 10% 提升到 {p}，但死亡的仍然是同樣的 900 人。應使用死亡率，而非被診斷者的存活率。",
+    odV0: "沒有過度診斷時，兩種情境的存活率都是 10%。",
+    quizH: "小測驗",
+    quizQ: "要讓篩檢計畫及對篩檢陽性者的早期治療真正有效，應該要有：",
+    qA: "有篩檢者的表面存活時間比未篩檢者長",
+    qB: "有篩檢者的存活時間比未篩檢者的「存活時間 + 領先時間」長",
+    qC: "有篩檢者的死亡比未篩檢者延後",
+    qD: "A 和 C", qE: "B 和 C",
+    qRight: "正確。存活時間必須超過未篩檢者的存活時間加上領先時間，也就等於死亡確實被延後。",
+    qWrong: "不太對。僅靠領先時間就能讓表面存活時間變長，而死亡並未延後。請在上方時間軸關閉「早期治療」再試試看。",
+    n1: "關閉早期治療時，有篩檢的病人在診斷後「存活」較久，甚至超過 5 年，卻在同一天死亡。篩檢增加的是「帶病時間」，而不是生命。",
+    n2: "只有當有篩檢者的存活時間長於未篩檢者的「領先時間 + 存活時間」，也就是死亡確實延後時，篩檢才真正有效。應比較死亡率，而非診斷後的存活。",
+    n4: "過度診斷加入了原本不會死於該疾病的人，使被診斷者的存活率膨脹，而死亡人數不變。",
+    n3: "一次篩檢較容易抓到生長緩慢、原本預後就較好的腫瘤（病程長度偏差）。在兩組都計入所有結果的隨機對照試驗可避免這兩種偏差。"
+  }
+};
+
+const NS = "http://www.w3.org/2000/svg";
+function mk(svg, tag, a, p) { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); (p || svg).appendChild(e); return e; }
+
+// ---------------- lead time ----------------
+const lt = document.getElementById("lt");
+const LX0 = 155, LX1 = 725, YMAX = 20;
+const tx = y => LX0 + (y / YMAX) * (LX1 - LX0);
+const ty = px => ((px - LX0) / (LX1 - LX0)) * YMAX;
+const L = { det: 3, scr: 5, sym: 8, death: 11, death2: 14, benefit: false };
+const Y1 = 60, Y2 = 140, Y3 = 215;
+const defs = mk(lt, "defs", {});
+const pat = mk(lt, "pattern", { id: "hatch", width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" }, defs);
+mk(lt, "rect", { width: 6, height: 6, fill: "var(--surface)" }, pat);
+mk(lt, "rect", { width: 3, height: 6, fill: "var(--b)" }, pat);
+const gStatic = mk(lt, "g", {}), gBars = mk(lt, "g", {}), gHandles = mk(lt, "g", {});
+const gCur = mk(lt, "g", { "pointer-events": "none", opacity: 0 });
+mk(lt, "line", { x1: 0, x2: 0, y1: 30, y2: 262, stroke: "var(--bad)", "stroke-width": 2.5 }, gCur);
+const curTxt = mk(lt, "text", { x: 0, y: 24, "text-anchor": "middle", class: "hlab", fill: "var(--bad)" }, gCur);
+let lifeRaf = 0, lifePlayed = false, LT = {};
+function lifeAt(tt) {
+  const d2 = L.benefit ? L.death2 : L.death;
+  const st = (who, dx, death) => tt < dx ? `<span>${Epi.t("lsNone", { who })}</span>`
+    : tt < death ? `<span class="dx">${Epi.t("lsDx", { who, y: (tt - dx).toFixed(1) })}</span>`
+    : `<span class="dead">${Epi.t("lsDead", { who, y: (death - dx).toFixed(1) })}</span>`;
+  document.getElementById("lifeStatus").innerHTML = `<span>${Epi.t("lsYear", { t: tt.toFixed(1) })}</span>` + st(Epi.t("laneNo"), L.sym, L.death) + st(Epi.t("laneScr"), L.scr, d2);
+  gCur.setAttribute("transform", `translate(${tx(tt)},0)`);
+  curTxt.textContent = tt.toFixed(1);
+}
+function playLife() {
+  cancelAnimationFrame(lifeRaf);
+  const end = Math.min(YMAX, (L.benefit ? L.death2 : L.death) + 1), dur = Epi.reduced() ? 1 : 5200, t0 = performance.now();
+  gCur.setAttribute("opacity", 1);
+  (function f(now) {
+    const k = Math.min(1, (now - t0) / dur);
+    lifeAt(k * end);
+    if (k < 1) lifeRaf = requestAnimationFrame(f);
+    else { lifePlayed = true; Epi.check(); }
+  })(t0);
+}
+document.getElementById("lifeBtn").onclick = playLife;
+
+function handle(key, y, color, labelKey, below) {
+  const g = mk(lt, "g", {}, gHandles);
+  mk(lt, "rect", { x: -14, y: y - 18, width: 28, height: 36, fill: "transparent" }, g);
+  mk(lt, "circle", { r: 9, cy: y, fill: color, stroke: "var(--surface)", "stroke-width": 2, class: "ring" }, g);
+  const t = mk(lt, "text", { y: below ? y + 28 : y - 16, "text-anchor": "middle", class: "hlab" }, g);
+  g._t = t; g._key = key; g._lab = labelKey;
+  Epi.svgHandle(g, { svg: lt, step: 0.5, toValue: px => Math.round(ty(px) * 2) / 2, getValue: () => L[key], onChange: v => setL(key, v) });
+  return g;
+}
+const H = {
+  det: handle("det", Y1, "var(--b)", "hDet"),
+  sym: handle("sym", Y1, "var(--a)", "hSym"),
+  death: handle("death", Y1, "var(--ink)", "hDeath"),
+  scr: handle("scr", Y3, "var(--b)", "hScr", true),
+  death2: handle("death2", Y3, "var(--ink)", "hDeath2", true)
+};
+function setL(key, v) {
+  v = Math.round(v * 2) / 2;
+  if (key === "det") L.det = Epi.clamp(v, 0.5, L.sym - 0.5);
+  if (key === "sym") L.sym = Epi.clamp(v, L.det + 0.5, L.death - 0.5);
+  if (key === "death") L.death = Epi.clamp(v, L.sym + 0.5, YMAX);
+  if (key === "scr") L.scr = Epi.clamp(v, L.det, L.sym);
+  if (key === "death2") L.death2 = Epi.clamp(v, L.death, YMAX);
+  L.scr = Epi.clamp(L.scr, L.det, L.sym);
+  L.death2 = Math.max(L.death2, L.death);
+  drawLT();
+}
+function drawStatic() {
+  gStatic.innerHTML = "";
+  [[Y1, "laneNat"], [Y2, "laneNo"], [Y3, "laneScr"]].forEach(([y, k]) => {
+    mk(lt, "text", { x: 0, y: y + 5, class: "lane-lab" }, gStatic).textContent = Epi.t(k);
+    mk(lt, "line", { x1: LX0, x2: LX1, y1: y, y2: y, stroke: "var(--rule)", "stroke-width": 2 }, gStatic);
+  });
+  for (let y = 0; y <= YMAX; y += 2) {
+    mk(lt, "line", { x1: tx(y), x2: tx(y), y1: 262, y2: 267, class: "axis" }, gStatic);
+    mk(lt, "text", { x: tx(y), y: 281, "text-anchor": "middle", class: "tick" }, gStatic).textContent = y;
+  }
+  mk(lt, "line", { x1: LX0, x2: LX1, y1: 262, y2: 262, class: "axis" }, gStatic);
+  mk(lt, "text", { x: (LX0 + LX1) / 2, y: 298, "text-anchor": "middle", class: "tick" }, gStatic).textContent = Epi.t("years");
+  mk(lt, "circle", { cx: tx(0), cy: Y1, r: 5, fill: "var(--muted)" }, gStatic);
+  mk(lt, "text", { x: tx(0), y: Y1 + 26, "text-anchor": "start", class: "hlab" }, gStatic).textContent = Epi.t("hOnset");
+}
+function bar(x0, x1, y, fill, h) { if (x1 > x0) mk(lt, "rect", { x: tx(x0), width: tx(x1) - tx(x0), y: y - (h || 10) / 2, height: h || 10, fill, rx: 2 }, gBars); }
+function drawLT() {
+  L.benefit = document.getElementById("benefit").checked;
+  const d2 = L.benefit ? L.death2 : L.death;
+  gBars.innerHTML = "";
+  bar(0, L.det, Y1, "var(--rule)"); bar(L.det, L.sym, Y1, "var(--b)"); bar(L.sym, L.death, Y1, "var(--a)");
+  bar(L.sym, L.death, Y2, "var(--a)", 14);
+  mk(lt, "circle", { cx: tx(L.sym), cy: Y2, r: 5, fill: "var(--a)" }, gBars);
+  mk(lt, "line", { x1: tx(L.death), x2: tx(L.death), y1: Y2 - 12, y2: Y2 + 12, stroke: "var(--ink)", "stroke-width": 3 }, gBars);
+  // 5-year mark on each lane
+  [[L.sym, Y2], [L.scr, Y3]].forEach(([dx, y]) => {
+    if (dx + 5 <= YMAX) {
+      mk(lt, "line", { x1: tx(dx + 5), x2: tx(dx + 5), y1: y - 16, y2: y + 16, stroke: "var(--muted)", "stroke-dasharray": "3 3" }, gBars);
+      mk(lt, "text", { x: tx(dx + 5) + 4, y: y - 10, class: "tick" }, gBars).textContent = "5 y";
+    }
+  });
+  bar(L.scr, L.sym, Y3, "url(#hatch)", 14);
+  bar(L.sym, d2, Y3, "var(--a)", 14);
+  if (L.sym - L.scr >= 1.5) mk(lt, "text", { x: (tx(L.scr) + tx(L.sym)) / 2, y: Y3 - 14, "text-anchor": "middle", class: "hlab" }, gBars).textContent = Epi.t("lgLead");
+  // guide lines from symptoms to lanes
+  mk(lt, "line", { x1: tx(L.sym), x2: tx(L.sym), y1: Y1 + 10, y2: Y3 + 10, stroke: "var(--muted)", "stroke-dasharray": "2 4" }, gBars);
+
+  const pos = { det: [L.det, Y1], sym: [L.sym, Y1], death: [L.death, Y1], scr: [L.scr, Y3], death2: [d2, Y3] };
+  Object.entries(H).forEach(([k, g]) => {
+    g.setAttribute("transform", `translate(${tx(pos[k][0])},0)`);
+    g._t.textContent = Epi.t(g._lab);
+    g.setAttribute("aria-label", Epi.t(g._lab));
+    g.setAttribute("aria-valuetext", Epi.t("yr", { v: pos[k][0] }));
+    g.setAttribute("aria-valuenow", pos[k][0]);
+  });
+  H.death2.style.display = L.benefit ? "" : "none";
+  if (!L.benefit) mk(lt, "line", { x1: tx(L.death), x2: tx(L.death), y1: Y3 - 12, y2: Y3 + 12, stroke: "var(--ink)", "stroke-width": 3 }, gBars);
+
+  const sNo = L.death - L.sym, sScr = d2 - L.scr, lead = L.sym - L.scr, gain = d2 - L.death;
+  LT = { sNo, sScr, gain, benefit: L.benefit };
+  cancelAnimationFrame(lifeRaf); gCur.setAttribute("opacity", 0); document.getElementById("lifeStatus").innerHTML = "";
+  Epi.check();
+  const yv = v => Epi.t("yr", { v: Number.isInteger(v) ? v : v.toFixed(1) });
+  const yn = b => `<span class="yn ${b ? "good" : "bad"}">${Epi.t(b ? "yes" : "no")}</span>`;
+  document.getElementById("ltBody").innerHTML =
+    `<tr><td>${Epi.t("rDx")}</td><td>${L.sym}</td><td>${L.scr}</td></tr>` +
+    `<tr><td>${Epi.t("rDeath")}</td><td>${L.death}</td><td>${d2}</td></tr>` +
+    `<tr><td>${Epi.t("rSurv")}</td><td>${yv(sNo)}</td><td><b>${yv(sScr)}</b></td></tr>` +
+    `<tr><td>${Epi.t("rFive")}</td><td>${yn(sNo >= 5)}</td><td>${yn(sScr >= 5)}</td></tr>` +
+    `<tr><td>${Epi.t("lgLead")}</td><td>—</td><td>${yv(lead)}</td></tr>`;
+  const v = document.getElementById("verdict");
+  if (gain > 0) { v.textContent = Epi.t("vReal", { g: gain, d: sScr - sNo, l: lead }); v.className = "verdict good"; }
+  else if (lead === 0) { v.textContent = Epi.t("vZero"); v.className = "verdict"; }
+  else { v.textContent = Epi.t("vNone", { d: lead }); v.className = "verdict bad"; }
+}
+
+// ---------------- length time ----------------
+const len = document.getElementById("len");
+const QX0 = 20, QX1 = 720, TMAX = 40, NT = 36;
+const qx = t => QX0 + (t / TMAX) * (QX1 - QX0);
+const qt = px => ((px - QX0) / (QX1 - QX0)) * TMAX;
+const R = Epi.rng(7);
+const tumours = [...Array(NT)].map((_, i) => {
+  const slow = i % 2 === 0;
+  const dur = slow ? 7 + R() * 5 : 1 + R() * 1.6;
+  const start = R() * (TMAX - dur);
+  return { slow, start, end: start + dur };
+});
+let day = 20, lastDet = 0, lastDetSlow = 0;
+const gT = mk(len, "g", {}), gAx = mk(len, "g", {});
+const lineG = mk(len, "g", {});
+const lineL = mk(len, "line", { y1: 22, y2: 262, stroke: "var(--ink)", "stroke-width": 2 }, lineG);
+mk(len, "rect", { x: -14, y: 10, width: 28, height: 256, fill: "transparent" }, lineG);
+const knob = mk(len, "circle", { cy: 22, r: 9, fill: "var(--ink)", stroke: "var(--surface)", "stroke-width": 2, class: "ring" }, lineG);
+const dayT = mk(len, "text", { y: 10, "text-anchor": "middle", class: "hlab" }, lineG);
+Epi.svgHandle(lineG, { svg: len, step: 0.5, toValue: px => qt(px), getValue: () => day, onChange: v => { day = Epi.clamp(v, 0, TMAX); drawLen(); } });
+lineL.setAttribute("x1", 0); lineL.setAttribute("x2", 0); knob.setAttribute("cx", 0); dayT.setAttribute("x", 0);
+
+function drawLenAxis() {
+  gAx.innerHTML = "";
+  mk(len, "line", { x1: QX0, x2: QX1, y1: 270, y2: 270, class: "axis" }, gAx);
+  mk(len, "text", { x: (QX0 + QX1) / 2, y: 292, "text-anchor": "middle", class: "tick" }, gAx).textContent = Epi.t("time");
+}
+function drawLen() {
+  gT.innerHTML = "";
+  let det = 0, detSlow = 0;
+  tumours.forEach((t, i) => {
+    const hit = t.start <= day && day <= t.end;
+    if (hit) { det++; if (t.slow) detSlow++; }
+    mk(len, "rect", { x: qx(t.start), width: qx(t.end) - qx(t.start), y: 32 + i * 6.4, height: 4.6, rx: 2, fill: t.slow ? "var(--a)" : "var(--bad)", opacity: hit ? 1 : 0.22 }, gT);
+  });
+  lineG.setAttribute("transform", `translate(${qx(day)},0)`);
+  dayT.textContent = Epi.t("screenDay");
+  lineG.setAttribute("aria-label", Epi.t("screenDay"));
+  lineG.setAttribute("aria-valuenow", day.toFixed(1));
+  document.getElementById("allShare").textContent = "50%";
+  document.getElementById("detShare").textContent = det ? Math.round((detSlow / det) * 100) + "%" : "—";
+  document.getElementById("detN").textContent = det;
+  lastDet = det; lastDetSlow = detSlow; Epi.check();
+}
+
+// ---------------- over-diagnosis ----------------
+let odN = 3000;
+function drawOd() {
+  document.getElementById("od").value = odN;
+  document.getElementById("odO").textContent = odN.toLocaleString();
+  const max = 1000 + 5000;
+  const row = (lab, dead, alive, od) => {
+    const tot = dead + alive + od, surv = (alive + od) / tot;
+    const seg = (n, bg, col) => `<i style="width:${(n / max) * 100}%;background:${bg};color:${col}">${n / max > 0.06 ? n.toLocaleString() : ""}</i>`;
+    return `<div class="odrow"><div class="lab">${lab}<small>${Epi.t("odN", { n: tot.toLocaleString() })} · ${Epi.t("odSurv", { p: Math.round(surv * 100) + "%" })}</small></div>
+      <div class="odbar">${seg(dead, "var(--ink)", "var(--paper)")}${seg(alive, "var(--a)", "#fff")}${seg(od, "var(--a-soft)", "var(--a)")}</div></div>`;
+  };
+  document.getElementById("odBars").innerHTML = row(Epi.t("od1"), 900, 100, 0) + row(Epi.t("od2"), 900, 100, odN);
+  const p = Math.round(((100 + odN) / (1000 + odN)) * 100) + "%";
+  const v = document.getElementById("odVerdict");
+  v.textContent = odN ? Epi.t("odV", { p }) : Epi.t("odV0");
+  v.className = odN ? "verdict bad" : "verdict";
+  Epi.check();
+}
+document.getElementById("od").addEventListener("input", e => { odN = Number(e.target.value); drawOd(); });
+
+// ---------------- quiz ----------------
+let picked = null;
+function drawQuiz() {
+  const ob = document.getElementById("opts");
+  ob.innerHTML = ["A", "B", "C", "D", "E"].map(k => `<button class="opt ${picked === k ? (k === "E" ? "right" : "wrong") : ""}" data-k="${k}">${k}. ${Epi.t("q" + k)}</button>`).join("");
+  ob.querySelectorAll(".opt").forEach(b => b.onclick = () => { picked = b.dataset.k; drawQuiz(); ob.querySelector(`[data-k="${picked}"]`).focus(); });
+  const fb = document.getElementById("quizFb");
+  fb.textContent = picked ? Epi.t(picked === "E" ? "qRight" : "qWrong") : "";
+  fb.className = picked ? (picked === "E" ? "good" : "bad") : "";
+  Epi.check();
+}
+
+document.getElementById("benefit").onchange = drawLT;
+Epi.missions("screening-bias", document.getElementById("missions"), [
+  { id: "life", en: "Play the patient's life and compare the two survival counters at death.", zh: "播放病人的一生，比較兩條時間軸在死亡時的存活計數。", test: () => lifePlayed },
+  { id: "illusion", en: "With no real benefit, make the screened patient pass 5 years after diagnosis while the unscreened one lives 2 years or less.", zh: "在沒有真正效益下，讓有篩檢者診斷後存活超過 5 年，而未篩檢者只活 2 年以內。", test: () => !LT.benefit && LT.sScr >= 5 && LT.sNo <= 2 },
+  { id: "real", en: "Give early treatment a real benefit: delay death by at least 3 years.", zh: "讓早期治療有真正效益：死亡延後至少 3 年。", test: () => LT.benefit && LT.gain >= 3 },
+  { id: "fast", en: "Find a screening day that catches at least one fast-growing tumour.", zh: "找出一個至少抓到一顆快速生長腫瘤的篩檢日。", test: () => lastDet > lastDetSlow },
+  { id: "od", en: "Use over-diagnosis to push 10-year survival above 80%.", zh: "利用過度診斷，讓 10 年存活率超過 80%。", test: () => (100 + odN) / (1000 + odN) > 0.8 },
+  { id: "quiz", en: "Answer the quiz correctly.", zh: "答對小測驗。", test: () => picked === "E" }
+]);
+Epi.loopAnim(document.getElementById("loop"), EpiLoops["screening-bias"]);
+Epi.init(I18N, () => { drawStatic(); drawLT(); drawLenAxis(); drawLen(); drawOd(); drawQuiz(); });
+</script>
+</body>
+</html>

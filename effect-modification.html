@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Confounding vs. effect modification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/epi.css">
+<style>
+  svg { width: 100%; height: auto; display: block; }
+  .tick { fill: var(--muted); font-size: 13px; }
+  .q { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+  .q .ask { font-weight: 600; }
+  .q .ask small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; }
+  .q .ans { font-weight: 800; font-size: 18px; padding: 3px 12px; border-radius: 999px; background: var(--paper); }
+  .q .ans.yes { background: var(--ink); color: var(--paper); }
+  .dx { margin-top: 14px; font-size: 22px; font-weight: 800; }
+  .dx small { display: block; font-size: 14px; font-weight: 400; color: var(--muted); margin-top: 4px; }
+  .rb { display: grid; grid-template-columns: 110px 1fr 52px; gap: 8px; align-items: center; font-size: 13px; margin: 4px 0; }
+  .rb .track { height: 14px; background: var(--paper); border-radius: 4px; overflow: hidden; }
+  .rb .fill { height: 100%; transition: width .2s; }
+  .gcard { border: 1px solid var(--rule); border-radius: 8px; padding: 14px; background: var(--paper); }
+  .gcard table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .gcard td { padding: 4px 14px 4px 0; font-size: 16px; }
+  .gcard td.v { font-weight: 800; font-size: 20px; }
+  .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin: 12px 0; }
+  .opt { font: inherit; font-weight: 600; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); cursor: pointer; }
+  .opt.right { border: 2px solid var(--good); } .opt.wrong { border: 2px solid var(--bad); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <a class="back" href="index.html" data-i18n="back">All activities</a>
+    <div class="lang-toggle" role="group" aria-label="Language / 語言"><button data-lang="en" lang="en">English</button><button data-lang="zh" lang="zh-Hant">繁體中文</button></div>
+  </header>
+
+  <h1 data-i18n="title">Confounding vs. effect modification</h1>
+  <p class="lede" data-i18n="lede">Both are revealed by stratifying on a third factor, but they mean opposite things: one is a bias to remove, the other a finding to report.</p>
+
+  <section class="panel loop-panel" id="loop" aria-label="Animated step-by-step explainer" data-i18n-aria="loopAria"></section>
+
+  <section class="panel missions" id="missions" style="margin-bottom:20px"></section>
+
+  <div class="cols-2-1">
+    <section class="panel">
+      <h2 data-i18n="forH">Stratum-specific, crude and adjusted RR</h2>
+      <svg id="forest" viewBox="0 0 640 250" role="img" aria-labelledby="forDesc"><desc id="forDesc" data-i18n="forDesc">Forest plot of risk ratios on a log scale.</desc></svg>
+      <div class="cols" style="margin-top:10px">
+        <div>
+          <h3 data-i18n="riskH">Risk of disease</h3>
+          <div id="risks"></div>
+        </div>
+        <div>
+          <h3 data-i18n="dagH">What is going on</h3>
+          <svg id="dag" viewBox="0 0 300 150" role="img" aria-label="Causal diagram" style="max-width:320px"></svg>
+        </div>
+      </div>
+    </section>
+
+    <aside class="stack">
+      <section class="panel">
+        <h2 data-i18n="setH">Build a scenario</h2>
+        <p class="small" data-i18n="setP">Exposure E, disease D, third factor: smoking.</p>
+        <div class="field"><label for="rr0"><span data-i18n="rr0L">RR in non-smokers</span><output id="rr0O"></output></label><input type="range" id="rr0" min="0" max="100" step="1"></div>
+        <div class="field"><label for="rr1"><span data-i18n="rr1L">RR in smokers</span><output id="rr1O"></output></label><input type="range" id="rr1" min="0" max="100" step="1"></div>
+        <div class="field"><label for="link"><span data-i18n="linkL">Smoking ↔ exposure link</span><output id="linkO"></output></label><input type="range" id="link" min="-100" max="100" step="1"></div>
+        <div class="field"><label for="base"><span data-i18n="baseL">Smoking raises disease risk ×</span><output id="baseO"></output></label><input type="range" id="base" min="1" max="8" step="0.1"></div>
+        <div class="btn-row" id="presets"></div>
+      </section>
+      <section class="panel">
+        <h2 data-i18n="diagH">Diagnosis</h2>
+        <div class="q"><div class="ask"><span data-i18n="q1">Do the stratum RRs differ from each other?</span><small data-i18n="q1s">rule of thumb here: by 1.5-fold or more</small></div><span class="ans" id="a1"></span></div>
+        <div class="q"><div class="ask"><span data-i18n="q2">Does the crude RR differ from the adjusted RR?</span><small data-i18n="q2s">rule of thumb: by 10% or more</small></div><span class="ans" id="a2"></span></div>
+        <div class="dx" id="dx" aria-live="polite"></div>
+      </section>
+    </aside>
+  </div>
+
+  <section class="panel game" data-challenge style="margin-top:20px">
+    <h2 data-i18n="gameH">Diagnose the study</h2>
+    <p class="small" data-i18n="gameP">Each card shows results from a stratified analysis. Is it confounding, effect modification, both, or neither?</p>
+    <div id="game"></div>
+  </section>
+
+  <section class="notice">
+    <h2 data-i18n="notice">What to notice</h2>
+    <ul>
+      <li data-i18n="n1">Confounding needs the third factor to be linked to BOTH the exposure and the outcome. Set the smoking–exposure link to 0, or the risk multiplier to 1, and the crude RR equals the adjusted RR.</li>
+      <li data-i18n="n2">Effect modification is about the stratum-specific RRs differing from each other. It does not need any link between smoking and the exposure, and randomization does not remove it.</li>
+      <li data-i18n="n3">When effect modification is present, a single adjusted (pooled) RR averages over strata whose effects truly differ, so report the stratum-specific RRs.</li>
+      <li data-i18n="n4">Effect modification depends on the scale: effects that differ on the ratio scale (RR) may not differ on the difference scale (risk difference).</li>
+    </ul>
+  </section>
+</div>
+
+<script src="assets/epi.js"></script>
+<script src="assets/loops.js"></script>
+<script>
+const I18N = {
+  en: {
+    pageTitle: "Confounding vs. effect modification", title: "Confounding vs. effect modification",
+    lede: "Both are revealed by stratifying on a third factor, but they mean opposite things: one is a bias to remove, the other a finding to report.",
+    forH: "Stratum-specific, crude and adjusted RR", forDesc: "Forest plot of risk ratios on a log scale.",
+    riskH: "Risk of disease", dagH: "What is going on",
+    setH: "Build a scenario", setP: "Exposure E, disease D, third factor: smoking.",
+    rr0L: "RR in non-smokers", rr1L: "RR in smokers", linkL: "Smoking ↔ exposure link", baseL: "Smoking raises disease risk ×",
+    pNeither: "Neither", pConf: "Pure confounding", pEM: "Pure effect modification", pBoth: "Both",
+    diagH: "Diagnosis", q1: "Do the stratum RRs differ from each other?", q1s: "rule of thumb here: by 1.5-fold or more",
+    q2: "Does the crude RR differ from the adjusted RR?", q2s: "rule of thumb: by 10% or more",
+    yes: "Yes", no: "No",
+    dNeither: "Neither", dNeitherS: "One effect, no distortion: the crude RR is fine.",
+    dConf: "Confounding", dConfS: "Report the adjusted RR; the crude RR is biased.",
+    dEM: "Effect modification", dEMS: "Report the stratum-specific RRs; a single summary would hide the difference.",
+    dBoth: "Effect modification and confounding", dBothS: "Report stratum-specific RRs; the crude RR is also distorted.",
+    rNon: "Non-smokers", rSmk: "Smokers", rCrude: "Crude", rAdj: "Adjusted (MH)",
+    unexp: "unexposed", exp: "exposed",
+    gE: "E", gD: "D", gZ: "Smoking", gMod: "modifies",
+    gameH: "Diagnose the study", gameP: "Each card shows results from a stratified analysis. Is it confounding, effect modification, both, or neither?",
+    gCrude: "Crude RR", gS0: "RR in non-smokers", gS1: "RR in smokers", gAdj: "Adjusted RR (Mantel–Haenszel)",
+    oConf: "Confounding", oEM: "Effect modification", oBoth: "Both", oNeither: "Neither", gNext: "Next study",
+    gRight: "Correct!", gWrong: "Not quite: this is {a}.",
+    gWhy: "Stratum RRs {s0} and {s1} {em}. Crude {c} vs adjusted {ad}: {cf}.",
+    gEmY: "differ from each other", gEmN: "are similar", gCfY: "they differ, so confounding", gCfN: "about the same, so no confounding",
+    gStreak: "Streak: {s} · correct {c} of {n}",
+    n1: "Confounding needs the third factor to be linked to BOTH the exposure and the outcome. Set the smoking–exposure link to 0, or the risk multiplier to 1, and the crude RR equals the adjusted RR.",
+    n2: "Effect modification is about the stratum-specific RRs differing from each other. It does not need any link between smoking and the exposure, and randomization does not remove it.",
+    n3: "When effect modification is present, a single adjusted (pooled) RR averages over strata whose effects truly differ, so report the stratum-specific RRs.",
+    n4: "Effect modification depends on the scale: effects that differ on the ratio scale (RR) may not differ on the difference scale (risk difference)."
+  },
+  zh: {
+    pageTitle: "干擾與效應修飾", title: "干擾與效應修飾",
+    lede: "兩者都要依第三因子分層才能看出來，但意義相反：一個是需要去除的偏差，另一個是需要報告的發現。",
+    forH: "各層、粗與調整後的 RR", forDesc: "以對數尺度呈現風險比的森林圖。",
+    riskH: "疾病風險", dagH: "發生了什麼事",
+    setH: "建立情境", setP: "曝露 E、疾病 D，第三因子：抽菸。",
+    rr0L: "不抽菸者的 RR", rr1L: "抽菸者的 RR", linkL: "抽菸與曝露的關聯", baseL: "抽菸使疾病風險增加 ×",
+    pNeither: "皆非", pConf: "單純干擾", pEM: "單純效應修飾", pBoth: "兩者皆有",
+    diagH: "診斷", q1: "各層的 RR 彼此不同嗎？", q1s: "此處的經驗法則：相差 1.5 倍以上",
+    q2: "粗 RR 與調整後 RR 不同嗎？", q2s: "經驗法則：相差 10% 以上",
+    yes: "是", no: "否",
+    dNeither: "皆非", dNeitherS: "只有一個效果，也沒有扭曲：粗 RR 可以使用。",
+    dConf: "干擾", dConfS: "報告調整後的 RR；粗 RR 有偏差。",
+    dEM: "效應修飾", dEMS: "報告各層各自的 RR；單一摘要值會掩蓋差異。",
+    dBoth: "效應修飾與干擾", dBothS: "報告各層各自的 RR；粗 RR 也受到扭曲。",
+    rNon: "不抽菸者", rSmk: "抽菸者", rCrude: "粗", rAdj: "調整後（MH）",
+    unexp: "未曝露", exp: "曝露",
+    gE: "E", gD: "D", gZ: "抽菸", gMod: "修飾",
+    gameH: "診斷這項研究", gameP: "每張卡片呈現一項分層分析的結果。這是干擾、效應修飾、兩者皆有，還是皆非？",
+    gCrude: "粗 RR", gS0: "不抽菸者的 RR", gS1: "抽菸者的 RR", gAdj: "調整後 RR（Mantel–Haenszel）",
+    oConf: "干擾", oEM: "效應修飾", oBoth: "兩者皆有", oNeither: "皆非", gNext: "下一項研究",
+    gRight: "正確！", gWrong: "不太對：這是{a}。",
+    gWhy: "各層 RR {s0} 與 {s1} {em}。粗 RR {c} 對調整後 {ad}：{cf}。",
+    gEmY: "彼此不同", gEmN: "相近", gCfY: "兩者不同，因此有干擾", gCfN: "大致相同，因此沒有干擾",
+    gStreak: "連勝：{s}・答對 {c}／{n}",
+    n1: "干擾需要第三因子同時與曝露及結果有關。把抽菸與曝露的關聯設為 0，或把風險倍數設為 1，粗 RR 就會等於調整後 RR。",
+    n2: "效應修飾指的是各層 RR 彼此不同。它不需要抽菸與曝露有任何關聯，隨機分派也不會消除它。",
+    n3: "有效應修飾時，單一的調整後（合併）RR 是把效果真的不同的各層平均起來，因此應報告各層各自的 RR。",
+    n4: "效應修飾取決於尺度：在比值尺度（RR）上不同的效果，在差值尺度（風險差）上不一定不同。"
+  }
+};
+
+// ---------- model ----------
+const sToRR = v => 0.5 * Math.pow(16, v / 100), rrToS = r => Math.round(100 * Math.log(r / 0.5) / Math.log(16));
+const S = { rr0: 1, rr1: 3, link: 0.6, base: 3 };
+function model(p) {
+  const N = 5000, b0 = 0.04, b1 = Math.min(0.9, 0.04 * p.base);
+  const pe0 = 0.5 - 0.45 * p.link, pe1 = 0.5 + 0.45 * p.link;
+  const st = [[pe0, b0, p.rr0], [pe1, b1, p.rr1]].map(([pe, b, rr]) => {
+    const n1 = N * pe, n0 = N - n1, r1 = Math.min(1, b * rr), r0 = b;
+    return { n1, n0, a: n1 * r1, c: n0 * r0, r1, r0, T: N };
+  });
+  const A = st[0].a + st[1].a, C = st[0].c + st[1].c, N1 = st[0].n1 + st[1].n1, N0 = st[0].n0 + st[1].n0;
+  const crude = (A / N1) / (C / N0);
+  const mh = st.reduce((s, x) => s + x.a * x.n0 / x.T, 0) / st.reduce((s, x) => s + x.c * x.n1 / x.T, 0);
+  const s0 = st[0].r1 / st[0].r0, s1 = st[1].r1 / st[1].r0;
+  const em = Math.max(s0, s1) / Math.min(s0, s1) >= 1.5, cf = Math.abs(crude / mh - 1) >= 0.10;
+  return { st, crude, mh, s0, s1, em, cf };
+}
+
+// ---------- forest plot ----------
+const fsvg = document.getElementById("forest"), NS = "http://www.w3.org/2000/svg";
+function mk(tag, a, p) { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); (p || fsvg).appendChild(e); return e; }
+const X0 = 170, X1 = 620, LO = 0.25, HI = 16;
+const fx = v => X0 + (Math.log(Math.min(HI, Math.max(LO, v)) / LO) / Math.log(HI / LO)) * (X1 - X0);
+const gF = mk("g", {});
+function drawForest(m) {
+  gF.innerHTML = "";
+  const rows = [["rNon", m.s0, "var(--ink)", "c"], ["rSmk", m.s1, "var(--ink)", "o"], ["rCrude", m.crude, "var(--bad)", "d"], ["rAdj", m.mh, "var(--a)", "s"]];
+  mk("rect", { x: X0, y: 14, width: X1 - X0, height: 88, fill: m.em ? "color-mix(in srgb, var(--a) 10%, transparent)" : "none", rx: 6 }, gF);
+  [0.25, 0.5, 1, 2, 4, 8, 16].forEach(v => {
+    mk("line", { x1: fx(v), x2: fx(v), y1: 10, y2: 210, stroke: v === 1 ? "var(--ink)" : "var(--rule)", "stroke-dasharray": v === 1 ? "4 4" : "" }, gF);
+    mk("text", { x: fx(v), y: 230, "text-anchor": "middle", class: "tick" }, gF).textContent = v;
+  });
+  mk("text", { x: (X0 + X1) / 2, y: 248, "text-anchor": "middle", class: "tick" }, gF).textContent = "RR (log)";
+  rows.forEach(([k, v, col, shape], i) => {
+    const y = 36 + i * 48 + (i >= 2 ? 12 : 0);
+    mk("text", { x: X0 - 12, y: y + 5, "text-anchor": "end", "font-size": 15, "font-weight": 700, fill: col }, gF).textContent = Epi.t(k);
+    const x = fx(v);
+    if (shape === "c") mk("circle", { cx: x, cy: y, r: 9, fill: col }, gF);
+    else if (shape === "o") mk("circle", { cx: x, cy: y, r: 8, fill: "var(--surface)", stroke: col, "stroke-width": 3 }, gF);
+    else if (shape === "d") mk("rect", { x: x - 8, y: y - 8, width: 16, height: 16, fill: col, transform: `rotate(45 ${x} ${y})` }, gF);
+    else mk("rect", { x: x - 9, y: y - 9, width: 18, height: 18, rx: 3, fill: col }, gF);
+    mk("text", { x: x + (x > 560 ? -16 : 16), y: y + 5, "text-anchor": x > 560 ? "end" : "start", "font-size": 14, "font-weight": 800, fill: col, class: "halo" }, gF).textContent = v.toFixed(2);
+  });
+  if (m.cf) {
+    const yc = 36 + 2 * 48 + 12, ya = 36 + 3 * 48 + 12;
+    mk("line", { x1: fx(m.crude), x2: fx(m.mh), y1: (yc + ya) / 2, y2: (yc + ya) / 2, stroke: "var(--bad)", "stroke-width": 2, "stroke-dasharray": "3 3" }, gF);
+  }
+}
+
+// ---------- DAG ----------
+const dsvg = document.getElementById("dag");
+function dk(tag, a, p) { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); (p || dsvg).appendChild(e); return e; }
+function drawDag(m) {
+  dsvg.innerHTML = "";
+  const defs = dk("defs", {}); const mm = dk("marker", { id: "emk", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: "auto" }, defs); dk("path", { d: "M0,0 L10,5 L0,10 z", fill: "context-stroke" }, mm);
+  const nodeAt = (x, y, txt, col) => { dk("rect", { x: x - 34, y: y - 14, width: 68, height: 28, rx: 14, fill: "var(--surface)", stroke: col, "stroke-width": 2 }); const tt = dk("text", { x, y: y + 5, "text-anchor": "middle", "font-size": 13, "font-weight": 700, fill: col }); tt.textContent = txt; };
+  const line = (x1, y1, x2, y2, w, col, op, dash) => dk("line", { x1, y1, x2, y2, stroke: col, "stroke-width": w, opacity: op, "marker-end": "url(#emk)", "stroke-dasharray": dash || "" });
+  const lk = Math.abs(S.link), bz = (S.base - 1) / 7, rrAvg = Math.sqrt(S.rr0 * S.rr1);
+  line(128, 40, 70, 106, 1 + 5 * lk, "var(--bad)", lk < 0.02 ? 0.12 : 1);
+  line(172, 40, 230, 106, 1 + 5 * bz, "var(--bad)", bz < 0.01 ? 0.12 : 1);
+  const effW = 1 + 3 * Math.min(1, Math.abs(Math.log(rrAvg)) / Math.log(4));
+  line(106, 120, 194, 120, effW, "var(--ink)", Math.abs(Math.log(rrAvg)) < 0.02 && !m.em ? 0.25 : 1, Math.abs(Math.log(rrAvg)) < 0.02 && !m.em ? "5 4" : "");
+  if (m.em) { line(150, 40, 150, 112, 2.5, "var(--a)", 1); const t = dk("text", { x: 156, y: 82, "font-size": 11, "font-weight": 700, fill: "var(--a)" }); t.textContent = Epi.t("gMod"); }
+  nodeAt(150, 26, Epi.t("gZ"), "var(--bad)"); nodeAt(70, 120, Epi.t("gE"), "var(--ink)"); nodeAt(230, 120, Epi.t("gD"), "var(--ink)");
+}
+
+// ---------- page update ----------
+let lastM = null;
+function update() {
+  document.getElementById("rr0").value = rrToS(S.rr0); document.getElementById("rr1").value = rrToS(S.rr1);
+  document.getElementById("link").value = Math.round(S.link * 100); document.getElementById("base").value = S.base;
+  document.getElementById("rr0O").textContent = S.rr0.toFixed(2); document.getElementById("rr1O").textContent = S.rr1.toFixed(2);
+  document.getElementById("linkO").textContent = (S.link > 0 ? "+" : "") + Math.round(S.link * 100) + "%";
+  document.getElementById("baseO").textContent = "×" + (+S.base).toFixed(1);
+  const m = model(S); lastM = m;
+  drawForest(m); drawDag(m);
+  const bar = (lab, v, col) => `<div class="rb"><span>${lab}</span><div class="track"><div class="fill" style="width:${Math.min(100, v * 100 / 0.6)}%;background:${col}"></div></div><span class="num">${(v * 100).toFixed(1)}%</span></div>`;
+  document.getElementById("risks").innerHTML =
+    `<div class="small" style="font-weight:700;margin-top:4px">${Epi.t("rNon")}</div>` + bar(Epi.t("unexp"), m.st[0].r0, "var(--b)") + bar(Epi.t("exp"), m.st[0].r1, "var(--a)") +
+    `<div class="small" style="font-weight:700;margin-top:8px">${Epi.t("rSmk")}</div>` + bar(Epi.t("unexp"), m.st[1].r0, "var(--b)") + bar(Epi.t("exp"), m.st[1].r1, "var(--a)");
+  const a1 = document.getElementById("a1"), a2 = document.getElementById("a2");
+  a1.textContent = Epi.t(m.em ? "yes" : "no"); a1.className = "ans" + (m.em ? " yes" : "");
+  a2.textContent = Epi.t(m.cf ? "yes" : "no"); a2.className = "ans" + (m.cf ? " yes" : "");
+  const k = m.em && m.cf ? "dBoth" : m.em ? "dEM" : m.cf ? "dConf" : "dNeither";
+  const dx = document.getElementById("dx");
+  dx.innerHTML = `${Epi.t(k)}<small>${Epi.t(k + "S")}</small>`;
+  dx.style.color = m.em ? "var(--a)" : m.cf ? "var(--bad)" : "var(--ink)";
+  Epi.check();
+}
+const PRE = { pNeither: [2, 2, 0, 3], pConf: [1, 1, 0.8, 5], pEM: [1, 4, 0, 3], pBoth: [1, 4, 0.6, 3] };
+function renderPresets() {
+  const box = document.getElementById("presets");
+  box.innerHTML = Object.keys(PRE).map(k => `<button class="btn ghost" data-k="${k}">${Epi.t(k)}</button>`).join("");
+  box.querySelectorAll("button").forEach(b => b.onclick = () => { [S.rr0, S.rr1, S.link, S.base] = PRE[b.dataset.k]; update(); });
+}
+document.getElementById("rr0").addEventListener("input", e => { S.rr0 = sToRR(+e.target.value); update(); });
+document.getElementById("rr1").addEventListener("input", e => { S.rr1 = sToRR(+e.target.value); update(); });
+document.getElementById("link").addEventListener("input", e => { S.link = +e.target.value / 100; update(); });
+document.getElementById("base").addEventListener("input", e => { S.base = +e.target.value; update(); });
+
+// ---------- diagnosis game ----------
+const G = { streak: 0, best: 0, correct: 0, n: 0, cur: null, picked: null };
+const KEYS = ["conf", "em", "both", "neither"];
+function classify(m) { return m.em && m.cf ? "both" : m.em ? "em" : m.cf ? "conf" : "neither"; }
+function newCase() {
+  const want = KEYS[Math.floor(Math.random() * 4)];
+  for (let tries = 0; tries < 4000; tries++) {
+    const p = { rr0: +(0.6 + Math.random() * 4).toFixed(2), rr1: 0, link: (Math.random() * 2 - 1) * 0.9, base: 1 + Math.random() * 6 };
+    p.rr1 = Math.random() < 0.5 ? p.rr0 * (0.9 + Math.random() * 0.2) : +(0.6 + Math.random() * 5).toFixed(2);
+    const m = model(p);
+    const ratio = Math.max(m.s0, m.s1) / Math.min(m.s0, m.s1), chg = Math.abs(m.crude / m.mh - 1);
+    if ((ratio > 1.2 && ratio < 1.8) || (chg > 0.05 && chg < 0.18)) continue;   // avoid borderline cases
+    if (classify(m) === want) return { p, m, ans: want };
+  }
+  return newCase();
+}
+function renderGame() {
+  if (!G.cur) G.cur = newCase();
+  const m = G.cur.m, f = v => v.toFixed(2);
+  const lbl = { conf: "oConf", em: "oEM", both: "oBoth", neither: "oNeither" };
+  let fb = "";
+  if (G.picked) {
+    const ok = G.picked === G.cur.ans;
+    fb = `<p class="${ok ? "good" : "bad"}" style="font-weight:800;font-size:18px;margin:6px 0 2px">${ok ? Epi.t("gRight") : Epi.t("gWrong", { a: Epi.t(lbl[G.cur.ans]) })}</p>
+      <p class="small">${Epi.t("gWhy", { s0: f(m.s0), s1: f(m.s1), em: Epi.t(m.em ? "gEmY" : "gEmN"), c: f(m.crude), ad: f(m.mh), cf: Epi.t(m.cf ? "gCfY" : "gCfN") })}</p>`;
+  }
+  document.getElementById("game").innerHTML = `<div class="gcard"><table>
+      <tr><td>${Epi.t("gS0")}</td><td class="v">${f(m.s0)}</td></tr>
+      <tr><td>${Epi.t("gS1")}</td><td class="v">${f(m.s1)}</td></tr>
+      <tr><td>${Epi.t("gCrude")}</td><td class="v bad">${f(m.crude)}</td></tr>
+      <tr><td>${Epi.t("gAdj")}</td><td class="v a">${f(m.mh)}</td></tr></table></div>
+    <div class="opts">${KEYS.map(k => `<button class="opt ${G.picked ? (k === G.cur.ans ? "right" : k === G.picked ? "wrong" : "") : ""}" data-k="${k}" ${G.picked ? "disabled" : ""}>${Epi.t(lbl[k])}</button>`).join("")}</div>
+    ${fb}
+    <div class="btn-row" style="align-items:center">${G.picked ? `<button class="btn" id="gNext">${Epi.t("gNext")}</button>` : ""}<span class="small">${Epi.t("gStreak", { s: G.streak, c: G.correct, n: G.n })}</span></div>`;
+  document.querySelectorAll("#game .opt").forEach(b => b.onclick = () => {
+    G.picked = b.dataset.k; G.n++;
+    if (G.picked === G.cur.ans) { G.correct++; G.streak++; G.best = Math.max(G.best, G.streak); const r = b.getBoundingClientRect(); Epi.confetti(r.left + r.width / 2, r.top); }
+    else G.streak = 0;
+    renderGame(); Epi.check();
+    const nx = document.getElementById("gNext"); if (nx) nx.focus();
+  });
+  const nx = document.getElementById("gNext");
+  if (nx) nx.onclick = () => { G.cur = newCase(); G.picked = null; renderGame(); const o = document.querySelector("#game .opt"); if (o) o.focus(); };
+}
+
+Epi.missions("effect-modification", document.getElementById("missions"), [
+  { id: "conf", en: "Pure confounding: make both stratum RRs 1.0, yet a crude RR of at least 2.", zh: "單純干擾：讓兩層 RR 都是 1.0，但粗 RR 至少為 2。", test: () => lastM && Math.abs(lastM.s0 - 1) < 0.06 && Math.abs(lastM.s1 - 1) < 0.06 && lastM.crude >= 2 },
+  { id: "em", en: "Pure effect modification: stratum RRs at least 3-fold apart, with the crude RR within 5% of the adjusted RR.", zh: "單純效應修飾：兩層 RR 相差至少 3 倍，且粗 RR 與調整後 RR 相差在 5% 以內。", test: () => lastM && Math.max(lastM.s0, lastM.s1) / Math.min(lastM.s0, lastM.s1) >= 3 && Math.abs(lastM.crude / lastM.mh - 1) < 0.05 },
+  { id: "simpson", en: "Simpson's paradox: both strata show harm (RR above 1), but the crude RR is below 1.", zh: "辛普森悖論：兩層都顯示有害（RR 大於 1），但粗 RR 小於 1。", test: () => lastM && lastM.s0 > 1.05 && lastM.s1 > 1.05 && lastM.crude < 0.95 },
+  { id: "game", en: "Diagnose 4 studies correctly in a row.", zh: "連續正確診斷 4 項研究。", test: () => G.best >= 4 }
+]);
+Epi.loopAnim(document.getElementById("loop"), EpiLoops["effect-modification"]);
+Epi.init(I18N, () => { renderPresets(); update(); renderGame(); });
+</script>
+</body>
+</html>

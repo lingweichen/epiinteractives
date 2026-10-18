@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Intention-to-treat vs. as-treated</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/epi.css">
+<style>
+  .grpbox { border: 1px solid var(--rule); border-radius: 8px; padding: 12px; }
+  .grpbox h3 { display: flex; justify-content: space-between; gap: 8px; }
+  .grpbox h3 .small { white-space: nowrap; }
+  .dots { display: flex; flex-wrap: wrap; gap: 3px; }
+  .dot { width: 11px; height: 11px; border-radius: 2px; position: relative; }
+  .dot.A { background: var(--a); }
+  .dot.C { background: var(--b); }
+  .dot { will-change: transform; }
+  .dot.d::after { content: ""; position: absolute; inset: 2.5px; border-radius: 50%; background: var(--surface); }
+  .sub { margin-top: 8px; }
+  .sub .cap { font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  .view-toggle { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; margin-bottom: 14px; }
+  .view-toggle button { font: inherit; font-size: 15px; font-weight: 600; border: 0; padding: 8px 14px; background: transparent; color: var(--muted); cursor: pointer; }
+  .view-toggle button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .groups { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 560px) { .groups { grid-template-columns: 1fr; } }
+  .rr-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .rr { border-top: 4px solid var(--ink); padding-top: 10px; }
+  .rr .lab { font-weight: 700; }
+  .rr .zh { font-size: 13px; color: var(--muted); }
+  table.cells td.rg { font-weight: 700; text-align: left; vertical-align: top; }
+  table.cells td { text-align: center; }
+  table.cells th { text-align: center; }
+  .tag { display: inline-block; font-size: 13px; font-weight: 700; padding: 1px 8px; border-radius: 999px; }
+  .tag.A { background: var(--a-soft); color: var(--a); }
+  .tag.C { background: var(--b-soft); color: var(--b); }
+  .verdict { font-weight: 600; margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <a class="back" href="index.html" data-i18n="back">All activities</a>
+    <div class="lang-toggle" role="group" aria-label="Language / 語言"><button data-lang="en" lang="en">English</button><button data-lang="zh" lang="zh-Hant">繁體中文</button></div>
+  </header>
+
+  <h1 data-i18n="title">Intention-to-treat vs. as-treated</h1>
+  <p class="lede" data-i18n="lede">Patients do not always receive the treatment they were randomized to. Change the counts in the table and watch how the two analyses regroup the same people and give different answers.</p>
+
+  <section class="panel loop-panel" id="loop" aria-label="Animated step-by-step explainer" data-i18n-aria="loopAria"></section>
+
+  <section class="panel missions" id="missions" style="margin-bottom:20px"></section>
+
+  <div class="cols-2-1">
+    <section class="panel">
+      <h2 data-i18n="tableH">The trial data</h2>
+      <div class="btn-row" id="scen"></div>
+      <div class="scroll-x">
+        <table class="t cells">
+          <thead><tr><th style="text-align:left" data-i18n="randTo">Randomized to</th><th data-i18n="received">Treatment actually received</th><th data-i18n="dYes">Disease X (yes)</th><th data-i18n="dNo">Disease X (no)</th></tr></thead>
+          <tbody>
+            <tr><td class="rg" rowspan="2" data-i18n="g1">Group 1 (Drug A)</td><td><span class="tag A" data-i18n="drugA">Drug A</span></td><td><input class="scrub" id="c0" type="number" min="0" max="300"></td><td><input class="scrub" id="c1" type="number" min="0" max="300"></td></tr>
+            <tr><td><span class="tag C" data-i18n="cur">Current treatment</span></td><td><input class="scrub" id="c2" type="number" min="0" max="300"></td><td><input class="scrub" id="c3" type="number" min="0" max="300"></td></tr>
+            <tr><td class="rg" rowspan="2" data-i18n="g2">Group 2 (Current treatment)</td><td><span class="tag A" data-i18n="drugA">Drug A</span></td><td><input class="scrub" id="c4" type="number" min="0" max="300"></td><td><input class="scrub" id="c5" type="number" min="0" max="300"></td></tr>
+            <tr><td><span class="tag C" data-i18n="cur">Current treatment</span></td><td><input class="scrub" id="c6" type="number" min="0" max="300"></td><td><input class="scrub" id="c7" type="number" min="0" max="300"></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small" style="margin-top:8px" data-i18n="dragHint">Drag a number left or right, or click to type.</p>
+
+      <h2 style="margin-top:22px" data-i18n="seeH">See who is compared with whom</h2>
+      <div class="view-toggle" role="group">
+        <button data-view="itt" data-i18n="vItt">Intention-to-treat</button>
+        <button data-view="at" data-i18n="vAt">As-treated</button>
+      </div>
+      <div class="groups" id="groups"></div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--a)"></i><span data-i18n="lgA">Received Drug A</span></span>
+        <span><i class="sw" style="background:var(--b)"></i><span data-i18n="lgC">Received current treatment</span></span>
+        <span><i class="dot A d" style="display:inline-block"></i><span data-i18n="lgD">Developed disease X</span></span>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <h2 data-i18n="resH">Cumulative incidence ratio</h2>
+      <p class="small" data-i18n="resP">Reference group: current treatment.</p>
+      <div class="rr-cards">
+        <div class="rr">
+          <div class="lab" data-i18n="vItt">Intention-to-treat</div>
+          <div class="big" id="rrItt"></div>
+          <div class="formula" id="fItt"></div>
+        </div>
+        <div class="rr">
+          <div class="lab" data-i18n="vAt">As-treated</div>
+          <div class="big" id="rrAt"></div>
+          <div class="formula" id="fAt"></div>
+        </div>
+      </div>
+      <p class="verdict" id="verdict" aria-live="polite"></p>
+      <hr style="border:0;border-top:1px solid var(--rule);margin:16px 0">
+      <h3 data-i18n="howH">How each analysis groups patients</h3>
+      <p class="small" data-i18n="howItt"><b>Intention-to-treat</b> compares patients by the group they were randomized to, whatever they actually received. It preserves randomization, so the groups stay comparable; the estimate is usually diluted towards 1 (more conservative).</p>
+      <p class="small" data-i18n="howAt"><b>As-treated</b> compares patients by the treatment they actually received. People who switch are rarely a random subset, so this breaks randomization and can bring back confounding.</p>
+    </aside>
+  </div>
+
+  <section class="notice">
+    <h2 data-i18n="notice">What to notice</h2>
+    <ul>
+      <li data-i18n="n1">Load “Frail patients refuse Drug A”. The drug does nothing (intention-to-treat ratio = 1.00), yet the as-treated analysis makes it look protective, because sicker patients crossed over to current treatment.</li>
+      <li data-i18n="n2">Set every crossover cell to 0: with full compliance the two analyses agree.</li>
+      <li data-i18n="n3">Crossovers move the intention-to-treat estimate towards 1. That is the price of keeping randomization intact.</li>
+    </ul>
+  </section>
+</div>
+
+<script src="assets/epi.js"></script>
+<script src="assets/loops.js"></script>
+<script>
+const SCEN = {
+  slide: [3, 63, 2, 32, 1, 22, 5, 47],
+  frail: [7, 63, 9, 21, 1, 9, 15, 75],
+  none: [5, 95, 0, 0, 0, 0, 6, 69]
+};
+const I18N = {
+  en: {
+    pageTitle: "Intention-to-treat vs. as-treated", title: "Intention-to-treat vs. as-treated",
+    lede: "Patients do not always receive the treatment they were randomized to. Change the counts in the table and watch how the two analyses regroup the same people and give different answers.",
+    tableH: "The trial data", randTo: "Randomized to", received: "Treatment actually received", dYes: "Disease X (yes)", dNo: "Disease X (no)",
+    g1: "Group 1 (Drug A)", g2: "Group 2 (Current treatment)", drugA: "Drug A", cur: "Current treatment",
+    sSlide: "Office hour example", sFrail: "Frail patients refuse Drug A", sNone: "No crossover",
+    seeH: "See who is compared with whom", vItt: "Intention-to-treat", vAt: "As-treated",
+    lgA: "Received Drug A", lgC: "Received current treatment", lgD: "Developed disease X",
+    boxG1: "Randomized to Drug A", boxG2: "Randomized to current treatment", boxA: "Received Drug A", boxC: "Received current treatment",
+    from1: "from Group 1", from2: "from Group 2",
+    risk: "risk {r}",
+    resH: "Cumulative incidence ratio", resP: "Reference group: current treatment.",
+    vSame: "The two analyses agree.", vDiff: "The analyses disagree by {d}. Which comparison keeps the groups comparable?",
+    howH: "How each analysis groups patients",
+    howItt: "<b>Intention-to-treat</b> compares patients by the group they were randomized to, whatever they actually received. It preserves randomization, so the groups stay comparable; the estimate is usually diluted towards 1 (more conservative).",
+    howAt: "<b>As-treated</b> compares patients by the treatment they actually received. People who switch are rarely a random subset, so this breaks and loses the benefits of randomization. A <b>per-protocol</b> analysis that drops non-adherent patients changes who is retained and can introduce <b>selection bias</b>.",
+    n1: "Load “Frail patients refuse Drug A”. The drug does nothing (intention-to-treat ratio = 1.00), yet the as-treated analysis makes it look protective, because sicker patients crossed over to current treatment.",
+    n2: "Set every crossover cell to 0: with full compliance the two analyses agree.",
+    n3: "Crossovers move the intention-to-treat estimate towards 1. That is the price of keeping randomization intact."
+  },
+  zh: {
+    pageTitle: "治療意向分析與依實際治療分析", title: "治療意向分析與依實際治療分析",
+    lede: "病人不一定接受被隨機分派到的治療。調整表格中的數字，觀察兩種分析如何把同一群人重新分組，並得到不同的答案。",
+    tableH: "試驗資料", randTo: "隨機分派至", received: "實際接受的治療", dYes: "疾病 X（有）", dNo: "疾病 X（無）",
+    g1: "第 1 組（藥物 A）", g2: "第 2 組（現行治療）", drugA: "藥物 A", cur: "現行治療",
+    sSlide: "課堂範例", sFrail: "體弱病人拒絕藥物 A", sNone: "沒有交叉",
+    seeH: "誰和誰比較？", vItt: "治療意向分析", vAt: "依實際治療分析",
+    lgA: "接受藥物 A", lgC: "接受現行治療", lgD: "發生疾病 X",
+    boxG1: "隨機分派至藥物 A", boxG2: "隨機分派至現行治療", boxA: "實際接受藥物 A", boxC: "實際接受現行治療",
+    from1: "來自第 1 組", from2: "來自第 2 組",
+    risk: "風險 {r}",
+    resH: "累積發生率比", resP: "參考組：現行治療。",
+    vSame: "兩種分析結果一致。", vDiff: "兩種分析相差 {d}。哪一種比較能維持兩組的可比較性？",
+    howH: "兩種分析如何分組",
+    howItt: "<b>治療意向分析（ITT）</b>依病人原本被隨機分派的組別比較，不論實際接受何種治療。它保留了隨機分派，使兩組維持可比較；估計值通常被稀釋而趨向 1（較保守）。",
+    howAt: "<b>依實際治療分析（as-treated）</b>依病人實際接受的治療比較。換組的人很少是隨機的一群，因此會破壞並失去隨機分派的好處。<b>依計畫書分析（per-protocol）</b>剔除未遵從的病人，改變了誰被保留，可能造成<b>選樣偏差</b>。",
+    n1: "載入「體弱病人拒絕藥物 A」。藥物其實沒有效果（ITT 比值 = 1.00），但因為較虛弱的病人交叉到現行治療，依實際治療分析卻讓藥物看起來具有保護效果。",
+    n2: "把所有交叉的格子設為 0：完全遵從時，兩種分析結果一致。",
+    n3: "交叉會使 ITT 估計值趨向 1，這是維持隨機分派完整所付出的代價。"
+  }
+};
+
+const inputs = [...Array(8)].map((_, i) => document.getElementById("c" + i));
+let view = "itt", curScen = "slide", lastItt = NaN, lastAt = NaN;
+const dotEls = [[], [], [], [], [], [], [], []];   // persistent dots per table cell, so regrouping can animate
+
+function load(v, scen) { v.forEach((x, i) => inputs[i].value = x); curScen = scen || null; update(); }
+function vals() { return inputs.map(el => Math.max(0, Number(el.value) || 0)); }
+
+const CELL_KIND = ["A d", "A", "C d", "C", "A d", "A", "C d", "C"];
+function syncDots(v) {
+  v.forEach((n, i) => {
+    const arr = dotEls[i];
+    while (arr.length < n) { const e = document.createElement("i"); e.className = "dot " + CELL_KIND[i]; arr.push(e); }
+    while (arr.length > n) arr.pop().remove();
+  });
+}
+function box(title, parts, risk) {
+  return `<div class="grpbox"><h3><span>${title}</span><span class="num small">${Epi.t("risk", { r: Epi.fmt(risk, 3) })}</span></h3>${parts.map(p => `<div class="sub">${p.cap ? `<div class="cap">${p.cap}</div>` : ""}<div class="dots" aria-hidden="true" data-cells="${p.cells.join(",")}"></div></div>`).join("")}</div>`;
+}
+let shownView = null;
+
+function update() {
+  const [a1d, a1n, c1d, c1n, a2d, a2n, c2d, c2n] = vals();
+  const g1 = a1d + a1n + c1d + c1n, g2 = a2d + a2n + c2d + c2n;
+  const rItt1 = (a1d + c1d) / g1, rItt2 = (a2d + c2d) / g2;
+  const nA = a1d + a1n + a2d + a2n, nC = c1d + c1n + c2d + c2n;
+  const rA = (a1d + a2d) / nA, rC = (c1d + c2d) / nC;
+  const rrItt = rItt1 / rItt2, rrAt = rA / rC;
+
+  document.getElementById("rrItt").textContent = Epi.fmt(rrItt, 2);
+  document.getElementById("rrAt").textContent = Epi.fmt(rrAt, 2);
+  document.getElementById("fItt").innerHTML = `(${a1d + c1d}/${g1}) ÷ (${a2d + c2d}/${g2})`;
+  document.getElementById("fAt").innerHTML = `(${a1d + a2d}/${nA}) ÷ (${c1d + c2d}/${nC})`;
+  const v = document.getElementById("verdict");
+  if (isFinite(rrItt) && isFinite(rrAt)) {
+    const d = Math.abs(Number(Epi.fmt(rrItt, 2)) - Number(Epi.fmt(rrAt, 2)));
+    v.textContent = d < 0.005 ? Epi.t("vSame") : Epi.t("vDiff", { d: d.toFixed(2) });
+  } else v.textContent = "";
+
+  const G = document.getElementById("groups");
+  syncDots(vals());
+  const all = dotEls.flat();
+  const lay = () => {
+    G.innerHTML = view === "itt"
+      ? box(Epi.t("boxG1"), [{ cells: [0, 1, 2, 3] }], rItt1) + box(Epi.t("boxG2"), [{ cells: [4, 5, 6, 7] }], rItt2)
+      : box(Epi.t("boxA"), [{ cap: Epi.t("from1"), cells: [0, 1] }, { cap: Epi.t("from2"), cells: [4, 5] }], rA) +
+        box(Epi.t("boxC"), [{ cap: Epi.t("from1"), cells: [2, 3] }, { cap: Epi.t("from2"), cells: [6, 7] }], rC);
+    G.querySelectorAll(".dots").forEach(c => c.dataset.cells.split(",").forEach(i => dotEls[i].forEach(e => c.appendChild(e))));
+  };
+  if (shownView && shownView !== view) Epi.flip(all, lay, { duration: 800, stagger: 2 }); else lay();
+  shownView = view;
+  lastItt = rrItt; lastAt = rrAt;
+  Epi.check();
+  document.querySelectorAll(".view-toggle button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.view === view)));
+}
+
+function renderScen() {
+  const box = document.getElementById("scen");
+  box.innerHTML = [["slide", "sSlide"], ["frail", "sFrail"], ["none", "sNone"]]
+    .map(([k, l]) => `<button class="btn ghost" data-s="${k}">${Epi.t(l)}</button>`).join("");
+  box.querySelectorAll("button").forEach(b => b.onclick = () => load(SCEN[b.dataset.s], b.dataset.s));
+}
+
+inputs.forEach(el => Epi.scrub(el, () => { curScen = null; update(); }));
+const cross = () => { const v = vals(); return v[2] + v[3] + v[4] + v[5]; };
+Epi.missions("itt", document.getElementById("missions"), [
+  { id: "frail", en: "Load “Frail patients refuse Drug A” and switch to the as-treated view. Watch the dots regroup.", zh: "載入「體弱病人拒絕藥物 A」並切換到依實際治療分析，看點點重新分組。", test: () => curScen === "frail" && view === "at" },
+  { id: "zero", en: "Edit the table so nobody crosses over. Do the analyses agree?", zh: "修改表格讓沒有人交叉，兩種分析是否一致？", test: () => cross() === 0 && curScen === null && isFinite(lastItt) },
+  { id: "agree", en: "Puzzle: make the two ratios agree (to 2 decimals) while keeping at least 10 crossovers.", zh: "解謎：保留至少 10 位交叉者，同時讓兩個比值（至小數第 2 位）一致。", test: () => cross() >= 10 && isFinite(lastItt) && lastItt.toFixed(2) === lastAt.toFixed(2) },
+  { id: "harm", en: "Puzzle: make as-treated suggest harm (ratio above 1.20) while intention-to-treat shows no effect (0.95 to 1.05).", zh: "解謎：讓依實際治療分析顯示有害（比值大於 1.20），而治療意向分析顯示沒有效果（0.95 至 1.05）。", test: () => lastAt > 1.2 && lastItt >= 0.95 && lastItt <= 1.05 }
+]);
+document.querySelectorAll(".view-toggle button").forEach(b => b.onclick = () => { view = b.dataset.view; update(); });
+load(SCEN.slide, "slide");
+Epi.loopAnim(document.getElementById("loop"), EpiLoops["itt"]);
+Epi.init(I18N, () => { renderScen(); update(); });
+</script>
+</body>
+</html>

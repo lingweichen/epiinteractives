@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trials, diagnostic tests and screening: interactive practice</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/epi.css">
+<style>
+  .topbar { justify-content: flex-end; }
+  .hero { max-width: 760px; margin-bottom: 40px; }
+  .group { margin-bottom: 40px; }
+  .group h2 { font-size: 15px; color: var(--muted); font-weight: 700; padding-bottom: 8px; border-bottom: 2px solid var(--ink); margin-bottom: 0; }
+  .group[data-c="a"] h2 { border-color: var(--a); }
+  .group[data-c="b"] h2 { border-color: var(--b); }
+  .group[data-c="r"] h2 { border-color: var(--bad); }
+  .act { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 6px 24px; padding: 18px 0; border-bottom: 1px solid var(--rule); text-decoration: none; color: inherit; }
+  .act:hover .name { text-decoration: underline; text-underline-offset: 3px; }
+  .act .name { font-size: 21px; font-weight: 700; line-height: 1.25; }
+  .act .desc { color: var(--muted); max-width: 66ch; grid-column: 1; }
+  .act .how { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 14px; color: var(--ink); border-left: 3px solid var(--rule); padding-left: 12px; }
+  @media (max-width: 640px) { .act { grid-template-columns: 1fr; } .act .how { grid-column: 1; grid-row: auto; } }
+  .pips { display: flex; gap: 4px; margin-top: 8px; }
+  .pips i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--good); display: block; }
+  .pips i.on { background: var(--good); }
+  .pips.full::after { content: "★"; color: var(--good); font-size: 14px; line-height: 10px; margin-left: 4px; }
+  .overall { max-width: 520px; margin: -12px 0 40px; }
+  .overall .bar { height: 12px; background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; overflow: hidden; margin-top: 6px; }
+  .overall .bar i { display: block; height: 100%; background: var(--good); transition: width .6s; }
+  footer { color: var(--muted); font-size: 14px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <div class="lang-toggle" role="group" aria-label="Language / 語言"><button data-lang="en" lang="en">English</button><button data-lang="zh" lang="zh-Hant">繁體中文</button></div>
+  </header>
+
+  <div class="hero">
+    <h1 data-i18n="title">Trials, diagnostic tests and screening</h1>
+    <p class="lede" data-i18n="lede">Twelve short interactive activities to go with Office hour 3. Each one takes a few minutes: drag, change the numbers, and see the concept respond.</p>
+  </div>
+
+  <div class="overall"><div id="overallTxt" style="font-weight:700"></div><div class="bar" aria-hidden="true"><i id="overallBar"></i></div></div>
+
+  <section class="group" data-c="a">
+    <h2 data-i18n="g1">Randomized controlled trials</h2>
+    <a class="act" href="randomization.html"><span class="name" data-i18n="t1">Randomize or hand-pick?</span><span class="desc" data-i18n="d1">Allocate patients yourself, then reveal an unmeasured risk factor. Compare with simple and stratified randomization, and see why trial size matters.</span><span class="how" data-i18n="h1">Drag patient cards into arms</span></a>
+    <a class="act" href="concealment-blinding.html"><span class="name" data-i18n="t2">Concealment vs. blinding</span><span class="desc" data-i18n="d2">Sort statements into allocation concealment or blinding, name single-, double- and triple-blind designs, and try the information bias quiz.</span><span class="how" data-i18n="h2">Drag statements into boxes</span></a>
+    <a class="act" href="power.html"><span class="name" data-i18n="t8">Type I and type II errors</span><span class="desc" data-i18n="d8">See false positives, false negatives and power as areas under two curves, and how sample size and effect size change them.</span><span class="how" data-i18n="h8">Drag the decision line</span></a>
+    <a class="act" href="nnt.html"><span class="name" data-i18n="t9">Relative risk, risk difference and NNT</span><span class="desc" data-i18n="d9">Two arrays of 1,000 patients show why the same relative risk can mean an NNT of 20 or 200.</span><span class="how" data-i18n="h9">Drag the risk sliders</span></a>
+    <a class="act" href="itt.html"><span class="name" data-i18n="t3">Intention-to-treat vs. as-treated</span><span class="desc" data-i18n="d3">Work through the crossover exercise, then see how frail patients switching treatment can make a useless drug look protective.</span><span class="how" data-i18n="h3">Drag numbers in the table</span></a>
+  </section>
+
+  <section class="group" data-c="b">
+    <h2 data-i18n="g2">Diagnostic and screening tests</h2>
+    <a class="act" href="diagnostic.html"><span class="name" data-i18n="t4">Cutoffs, prevalence and predictive values</span><span class="desc" data-i18n="d4">Move a test's cutoff to trade sensitivity against specificity, and watch PPV and NPV shift with prevalence.</span><span class="how" data-i18n="h4">Drag the cutoff and the prevalence</span></a>
+    <a class="act" href="multiple-tests.html"><span class="name" data-i18n="t5">Sequential vs. simultaneous testing</span><span class="desc" data-i18n="d5">Follow 1,000 people through two tests combined in series or in parallel, and compare net sensitivity, specificity and cost.</span><span class="how" data-i18n="h5">Drag the sliders</span></a>
+    <a class="act" href="kappa.html"><span class="name" data-i18n="t6">Agreement beyond chance: kappa</span><span class="desc" data-i18n="d6">Two physicians rate the same knees. Separate the agreement expected by chance from real agreement, including the rare-finding trap.</span><span class="how" data-i18n="h6">Drag numbers in the table</span></a>
+    <a class="act" href="screening-bias.html"><span class="name" data-i18n="t7">Lead-time, length-time and over-diagnosis bias</span><span class="desc" data-i18n="d7">See how screening can lengthen survival after diagnosis without delaying death, and why a screening round catches slow-growing tumours.</span><span class="how" data-i18n="h7">Drag points on timelines</span></a>
+  </section>
+
+  <section class="group" data-c="r">
+    <h2 data-i18n="g3">Bias, confounding and effect modification</h2>
+    <a class="act" href="confounding-selection.html"><span class="name" data-i18n="t11">Confounding vs. selection bias</span><span class="desc" data-i18n="d11">Watch a third factor distort a comparison, then watch drop-outs do it in a perfectly randomized trial. Sort ten scenarios into confounding, selection bias or information bias.</span><span class="how" data-i18n="h11">Causal diagrams, sort the biases</span></a>
+    <a class="act" href="effect-modification.html"><span class="name" data-i18n="t12">Confounding vs. effect modification</span><span class="desc" data-i18n="d12">Stratify by a third factor and compare: similar stratum RRs that differ from the crude RR signal confounding; stratum RRs that differ from each other signal effect modification.</span><span class="how" data-i18n="h12">Build scenarios, diagnose studies</span></a>
+    <a class="act" href="misclassification.html"><span class="name" data-i18n="t10">Non-differential vs. differential misclassification</span><span class="desc" data-i18n="d10">Make the exposure questionnaire less accurate in cases, controls or both, and watch the odds ratio move towards or away from the null.</span><span class="how" data-i18n="h10">Drag sensitivity and specificity</span></a>
+  </section>
+
+  <footer data-i18n="foot">Ling-Wei Chen, PhD · Institute of Epidemiology and Preventive Medicine, National Taiwan University</footer>
+</div>
+<script src="assets/epi.js"></script>
+<script>
+const TOTALS = { "effect-modification": 4, "confounding-selection": 4, randomization: 5, "concealment-blinding": 5, itt: 4, power: 5, nnt: 4, diagnostic: 4, "multiple-tests": 5, kappa: 5, "screening-bias": 6, misclassification: 4 };
+function progress() {
+  let done = 0, tot = 0;
+  document.querySelectorAll(".act").forEach(a => {
+    const page = a.getAttribute("href").replace(/^#/, "").replace(".html", "");
+    const T = TOTALS[page]; if (!T) return;
+    let d = 0;
+    try { d = ((JSON.parse(localStorage.getItem("epi-m-" + page) || "{}")).done || []).length; } catch (e) { /* ignore */ }
+    d = Math.min(d, T); done += d; tot += T;
+    let b = a.querySelector(".pips");
+    if (!b) { b = document.createElement("span"); b.className = "pips"; a.querySelector(".how").appendChild(b); }
+    b.innerHTML = [...Array(T)].map((_, i) => `<i class="${i < d ? "on" : ""}"></i>`).join("");
+    b.classList.toggle("full", d === T);
+    b.setAttribute("aria-label", `${d}/${T}`);
+  });
+  document.getElementById("overallTxt").textContent = Epi.t(done === 0 ? "overallNone" : done === tot ? "overallAll" : "overall", { d: done, t: tot });
+  document.getElementById("overallBar").style.width = (tot ? done / tot * 100 : 0) + "%";
+}
+Epi.init({
+  en: {
+    pageTitle: "Trials, diagnostic tests and screening: interactive practice",
+    title: "Trials, diagnostic tests and screening",
+    lede: "Twelve short interactive activities to go with Office hour 3. Each one starts with a step-by-step animation, then lets you explore and test yourself.",
+    overall: "Your progress: {d} of {t} missions", overallNone: "{t} missions to complete. Pick any activity to start.", overallAll: "All {t} missions complete!",
+    g1: "Randomized controlled trials", g2: "Diagnostic and screening tests",
+    t1: "Randomize or hand-pick?", d1: "Allocate patients yourself, then reveal an unmeasured risk factor. Compare with simple and stratified randomization, and see why trial size matters.", h1: "Drag patient cards into arms",
+    t2: "Concealment vs. blinding", d2: "Sort statements into allocation concealment or blinding, name single-, double- and triple-blind designs, and try the information bias quiz.", h2: "Timed sorting challenge",
+    t3: "Intention-to-treat vs. as-treated", d3: "Work through the crossover exercise, then see how frail patients switching treatment can make a useless drug look protective.", h3: "Drag numbers in the table",
+    t4: "Cutoffs, prevalence and predictive values", d4: "Move a test's cutoff to trade sensitivity against specificity, and watch PPV and NPV shift with prevalence.", h4: "Drag the cutoff, play guess-the-PPV",
+    t5: "Sequential vs. simultaneous testing", d5: "Follow 1,000 people through two tests combined in series or in parallel, and compare net sensitivity, specificity and cost.", h5: "Watch 100 people flow through",
+    t6: "Agreement beyond chance: kappa", d6: "Two physicians rate the same knees. Separate the agreement expected by chance from real agreement, including the rare-finding trap.", h6: "Drag the table, play guess-the-kappa",
+    t7: "Lead-time, length-time and over-diagnosis bias", d7: "See how screening can lengthen survival after diagnosis without delaying death, why a screening round catches slow-growing tumours, and how over-diagnosis inflates survival.",
+    t8: "Type I and type II errors", d8: "See false positives, false negatives and power as areas under two curves, and how sample size and effect size change them.", h8: "Drag the line, simulate 100 trials",
+    t9: "Relative risk, risk difference and NNT", d9: "Two arrays of 1,000 patients show why the same relative risk can mean an NNT of 20 or 200.", h9: "Treat patients one by one",
+    g3: "Bias, confounding and effect modification",
+    t12: "Confounding vs. effect modification", d12: "Stratify by a third factor and compare: similar stratum RRs that differ from the crude RR signal confounding; stratum RRs that differ from each other signal effect modification.", h12: "Build scenarios, diagnose studies",
+    t11: "Confounding vs. selection bias", d11: "Watch a third factor distort a comparison, then watch drop-outs do it in a perfectly randomized trial. Sort ten scenarios into confounding, selection bias or information bias.", h11: "Causal diagrams, sort the biases",
+    t10: "Non-differential vs. differential misclassification", d10: "Make the exposure questionnaire less accurate in cases, controls or both, and watch the odds ratio move towards or away from the null.", h10: "Drag sensitivity and specificity", h7: "Play a patient's life, drag timelines",
+    foot: "Ling-Wei Chen, PhD, Institute of Epidemiology and Preventive Medicine, National Taiwan University"
+  },
+  zh: {
+    pageTitle: "試驗、診斷檢測與篩檢：互動練習",
+    title: "試驗、診斷檢測與篩檢",
+    lede: "搭配 Office hour 3 的十二個簡短互動練習，每個都從逐步動畫開始，接著讓你動手探索並測驗自己。",
+    overall: "你的進度：已完成 {d}／{t} 個任務", overallNone: "共有 {t} 個任務，從任何一個練習開始吧。", overallAll: "全部 {t} 個任務完成！",
+    g1: "隨機對照試驗", g2: "診斷與篩檢檢測",
+    t1: "隨機分派還是自行挑選？", d1: "先自己分派病人，再揭露一個未測量的風險因子；與簡單隨機分派及分層隨機分派比較，並了解試驗規模為何重要。", h1: "把病人卡片拖進組別",
+    t2: "分派隱匿與盲性作業", d2: "把敘述分類到分派隱匿或盲性作業，辨認單盲、雙盲與三盲設計，並挑戰訊息偏差小測驗。", h2: "限時分類挑戰",
+    t3: "治療意向分析與依實際治療分析", d3: "完成交叉的課堂練習，再看看體弱病人換組如何讓無效的藥物看起來有保護效果。", h3: "拖曳表格中的數字",
+    t4: "切點、盛行率與預測值", d4: "移動檢測切點，在靈敏度與特異度之間取捨，並觀察陽性與陰性預測值如何隨盛行率改變。", h4: "拖曳切點，玩猜猜陽性預測值",
+    t5: "序列檢測與同時檢測", d5: "跟著 1,000 人走過串聯或並聯組合的兩種檢測，比較淨靈敏度、淨特異度與成本。", h5: "看 100 個人走過流程",
+    t6: "超越機遇的一致性：Kappa", d6: "兩位醫師評估同一群病人的膝蓋。區分機遇預期的一致與真正的一致，包括罕見發現的陷阱。", h6: "拖曳表格，玩猜猜 kappa",
+    t7: "領先時間、病程長度與過度診斷偏差", d7: "看篩檢如何在不延後死亡的情況下拉長診斷後存活時間、為何一次篩檢容易抓到生長緩慢的腫瘤，以及過度診斷如何膨脹存活率。",
+    t8: "第一型與第二型錯誤", d8: "把偽陽性、偽陰性與檢定力看成兩條曲線下的面積，並觀察樣本數與效果量如何改變它們。", h8: "拖曳決策線，模擬 100 次試驗",
+    t9: "相對危險性、危險差與 NNT", d9: "兩組各 1,000 位病人的圖像，說明為何同樣的相對危險性可能對應 NNT 20 或 200。", h9: "一位一位治療病人",
+    g3: "偏差、干擾與效應修飾",
+    t12: "干擾與效應修飾", d12: "依第三因子分層後比較：各層 RR 相近但與粗 RR 不同代表干擾；各層 RR 彼此不同代表效應修飾。", h12: "建立情境、診斷研究",
+    t11: "干擾與選樣偏差", d11: "看第三因子如何扭曲比較，再看退出者如何在完美的隨機試驗中造成偏差。把十個情境分類為干擾、選樣偏差或訊息偏差。", h11: "因果圖、偏差分類",
+    t10: "非差異性與差異性錯誤分類", d10: "讓曝露問卷在病例組、對照組或兩組中變得不準確，觀察勝算比如何偏向或偏離虛無值。", h10: "拖曳靈敏度與特異度", h7: "播放病人的一生，拖曳時間軸",
+    foot: "Ling-Wei Chen, PhD，國立臺灣大學公共衛生學院流行病學與預防醫學研究所"
+  }
+}, progress);
+</script>
+</body>
+</html>

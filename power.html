@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Type I and type II errors</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/epi.css">
+<style>
+  svg { width: 100%; height: auto; display: block; }
+  .tick { fill: var(--muted); font-size: 15px; }
+  .dec { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  .dec th, .dec td { border: 1px solid var(--rule); padding: 10px; text-align: center; vertical-align: middle; }
+  .dec th { font-size: 13px; color: var(--muted); font-weight: 600; }
+  .dec td .p { font-size: 26px; font-weight: 800; display: block; line-height: 1.1; }
+  .dec td .n { font-size: 13px; font-weight: 600; }
+  .dec td.ok { background: var(--paper); }
+  .dec td.e1 { background: color-mix(in srgb, var(--bad) 14%, var(--surface)); color: var(--bad); }
+  .dec td.e2 { background: var(--b-soft); color: var(--b); }
+  .dec td.pw { background: var(--a-soft); color: var(--a); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <a class="back" href="index.html" data-i18n="back">All activities</a>
+    <div class="lang-toggle" role="group" aria-label="Language / 語言"><button data-lang="en" lang="en">English</button><button data-lang="zh" lang="zh-Hant">繁體中文</button></div>
+  </header>
+
+  <h1 data-i18n="title">Type I and type II errors</h1>
+  <p class="lede" data-i18n="lede">A trial compares therapy A with therapy B. The grey curve shows the results we would see if the therapies truly do not differ; the blue curve, if they truly do. Drag the decision line, the effect size and the sample size to see how the two kinds of error trade off.</p>
+
+  <section class="panel loop-panel" id="loop" aria-label="Animated step-by-step explainer" data-i18n-aria="loopAria"></section>
+
+  <section class="panel missions" id="missions" style="margin-bottom:20px"></section>
+
+  <div class="cols-2-1">
+    <section class="panel">
+      <h2 data-i18n="curH">Possible trial results</h2>
+      <svg id="pw" viewBox="0 0 720 320" role="img" aria-label="Sampling distributions under no difference and under a true difference"></svg>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--bad)"></i><span data-i18n="lgA">Type I error, α (false positive)</span></span>
+        <span><i class="sw" style="background:var(--b)"></i><span data-i18n="lgB">Type II error, β (false negative)</span></span>
+        <span><i class="sw" style="background:var(--a)"></i><span data-i18n="lgP">Power, 1 − β</span></span>
+      </div>
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--rule)">
+        <div class="btn-row" style="align-items:center"><button class="btn play" id="simBtn" data-i18n="simBtn">Run 100 trials</button><span id="simCount" style="font-weight:700" aria-live="polite"></span></div>
+        <svg id="simsvg" viewBox="0 0 720 230" role="img" aria-label="Results of simulated trials"></svg>
+        <div class="legend" id="simLegend"></div>
+      </div>
+      <div class="cols" style="margin-top:14px">
+        <div class="field"><label for="alpha"><span data-i18n="alphaL">Significance level α (two-sided)</span><output id="alphaO"></output></label><input type="range" id="alpha" min="0" max="1000" step="1"></div>
+        <div class="field"><label for="d"><span data-i18n="dL">True difference (standardized effect size)</span><output id="dO"></output></label><input type="range" id="d" min="0" max="100" step="1"></div>
+        <div class="field"><label for="n"><span data-i18n="nL">Participants per group</span><output id="nO"></output></label><input type="range" id="n" min="5" max="400" step="1"></div>
+      </div>
+      <div class="btn-row" id="presets"></div>
+    </section>
+
+    <aside class="panel">
+      <h2 data-i18n="decH">Possible conclusions</h2>
+      <div class="scroll-x">
+        <table class="dec">
+          <thead><tr><th></th><th data-i18n="rNo">In reality: treatments do not differ</th><th data-i18n="rYes">In reality: treatments differ</th></tr></thead>
+          <tbody>
+            <tr><th data-i18n="cNo">We conclude: no difference</th><td class="ok"><span class="p" id="pa"></span><span class="n" data-i18n="ca">(a) Correct</span></td><td class="e2"><span class="p" id="pb"></span><span class="n" data-i18n="cb">(b) Type II error</span></td></tr>
+            <tr><th data-i18n="cYes">We conclude: they differ</th><td class="e1"><span class="p" id="pc"></span><span class="n" data-i18n="cc">(c) Type I error</span></td><td class="pw"><span class="p" id="pd"></span><span class="n" data-i18n="cd">(d) Correct: power</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p id="read" style="margin-top:14px" aria-live="polite"></p>
+    </aside>
+  </div>
+
+  <section class="notice">
+    <h2 data-i18n="notice">What to notice</h2>
+    <ul>
+      <li data-i18n="n1">Drag the decision line right (smaller α): fewer false positives, but more false negatives. With a fixed design you cannot shrink both errors at once.</li>
+      <li data-i18n="n2">Increasing the sample size narrows the overlap between the curves, so power rises without changing α. This is why trials calculate sample size in advance.</li>
+      <li data-i18n="n3">A small true effect needs a large trial. A “non-significant” result from a small trial is weak evidence that the treatments do not differ.</li>
+    </ul>
+  </section>
+</div>
+
+<script src="assets/epi.js"></script>
+<script src="assets/loops.js"></script>
+<script>
+const I18N = {
+  en: {
+    pageTitle: "Type I and type II errors", title: "Type I and type II errors",
+    simBtn: "Run 100 trials", simCount: "{k} of {n} trials were “significant”.", simHint: "Each dot is one simulated trial, landing at the z it observed.",
+    sDet: "Significant: difference detected", sMiss: "Not significant: type II error", sFp: "Significant: type I error (false positive)", sOk: "Not significant: correct",
+    lede: "A trial compares therapy A with therapy B. The grey curve shows the results we would see if the therapies truly do not differ; the blue curve, if they truly do. Drag the decision line, the effect size and the sample size to see how the two kinds of error trade off.",
+    curH: "Possible trial results",
+    lgA: "Type I error, α (false positive)", lgB: "Type II error, β (false negative)", lgP: "Power, 1 − β",
+    alphaL: "Significance level α (two-sided)", dL: "True difference (standardized effect size)", nL: "Participants per group",
+    pStd: "Typical design: α 0.05, power about 80%", pSmall: "Small trial", pNull: "Treatments truly identical",
+    decH: "Possible conclusions",
+    rNo: "In reality: treatments do not differ", rYes: "In reality: treatments differ",
+    cNo: "We conclude: no difference", cYes: "We conclude: they differ",
+    ca: "(a) Correct", cb: "(b) Type II error", cc: "(c) Type I error", cd: "(d) Correct: power",
+    h0: "No true difference", h1: "True difference", line: "decision line", sig: "“significant”", ns: "not significant",
+    axis: "Test statistic (z) observed in the trial",
+    read: "If the true difference is {d} SD and each group has {n} people, the trial detects it {pw} times in 100 and misses it {b} times in 100.",
+    readNull: "There is no true difference, so every “significant” result is a false positive: {a} in 100 trials.",
+    n1: "Drag the decision line right (smaller α): fewer false positives, but more false negatives. With a fixed design you cannot shrink both errors at once.",
+    n2: "Increasing the sample size narrows the overlap between the curves, so power rises without changing α. This is why trials calculate sample size in advance.",
+    n3: "A small true effect needs a large trial. A “non-significant” result from a small trial is weak evidence that the treatments do not differ."
+  },
+  zh: {
+    pageTitle: "第一型與第二型錯誤", title: "第一型與第二型錯誤",
+    simBtn: "執行 100 次試驗", simCount: "{n} 次試驗中有 {k} 次「顯著」。", simHint: "每個點代表一次模擬試驗，落在它觀察到的 z 值。",
+    sDet: "顯著：偵測到差異", sMiss: "不顯著：第二型錯誤", sFp: "顯著：第一型錯誤（偽陽性）", sOk: "不顯著：正確",
+    lede: "一項試驗比較治療 A 與治療 B。灰色曲線是「兩種治療實際上沒有差異」時可能看到的結果；藍色曲線則是「實際上有差異」時的結果。拖曳決策線、效果量與樣本數，看看兩種錯誤如何此消彼長。",
+    curH: "可能的試驗結果",
+    lgA: "第一型錯誤 α（偽陽性）", lgB: "第二型錯誤 β（偽陰性）", lgP: "檢定力 1 − β",
+    alphaL: "顯著水準 α（雙尾）", dL: "真實差異（標準化效果量）", nL: "每組人數",
+    pStd: "常見設計：α 0.05、檢定力約 80%", pSmall: "小型試驗", pNull: "兩種治療實際上相同",
+    decH: "可能的結論",
+    rNo: "實際上：兩種治療沒有差異", rYes: "實際上：兩種治療有差異",
+    cNo: "我們的結論：沒有差異", cYes: "我們的結論：有差異",
+    ca: "(a) 正確", cb: "(b) 第二型錯誤", cc: "(c) 第一型錯誤", cd: "(d) 正確：檢定力",
+    h0: "沒有真實差異", h1: "有真實差異", line: "決策線", sig: "「顯著」", ns: "不顯著",
+    axis: "試驗中觀察到的檢定統計量（z）",
+    read: "若真實差異為 {d} 個標準差、每組 {n} 人，每 100 次試驗中約有 {pw} 次能偵測到差異，{b} 次會錯過。",
+    readNull: "實際上沒有差異，因此每個「顯著」結果都是偽陽性：每 100 次試驗約 {a} 次。",
+    n1: "把決策線往右拖（α 變小）：偽陽性減少，但偽陰性增加。在固定的設計下，無法同時降低兩種錯誤。",
+    n2: "增加樣本數會縮小兩條曲線的重疊，使檢定力上升而 α 不變。這就是試驗要事先計算樣本數的原因。",
+    n3: "真實效果很小時需要大型試驗。小型試驗得到「不顯著」的結果，並不足以證明兩種治療沒有差異。"
+  }
+};
+
+// maths
+function erf(x) { const s = Math.sign(x); x = Math.abs(x); const t = 1 / (1 + 0.3275911 * x);
+  return s * (1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x)); }
+const Phi = z => 0.5 * (1 + erf(z / Math.SQRT2));
+function qnorm(p) { // Acklam
+  const a = [-39.6968302866538, 220.946098424521, -275.928510446969, 138.357751867269, -30.6647980661472, 2.50662827745924],
+        b = [-54.4760987982241, 161.585836858041, -155.698979859887, 66.8013118877197, -13.2806815528857],
+        c = [-0.00778489400243029, -0.322396458041136, -2.40075827716184, -2.54973253934373, 4.37466414146497, 2.93816398269878],
+        d = [0.00778469570904146, 0.32246712907004, 2.445134137143, 3.75440866190742];
+  const pl = 0.02425; let q, r;
+  if (p < pl) { q = Math.sqrt(-2 * Math.log(p)); return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+  if (p > 1 - pl) { q = Math.sqrt(-2 * Math.log(1 - p)); return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+  q = p - 0.5; r = q * q;
+  return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+}
+const pdf = (x, m) => Math.exp(-0.5 * (x - m) ** 2) / Math.sqrt(2 * Math.PI);
+
+const AMIN = 0.001, AMAX = 0.2;
+const sToA = v => AMIN * Math.pow(AMAX / AMIN, v / 1000);
+const aToS = a => Math.round(1000 * Math.log(a / AMIN) / Math.log(AMAX / AMIN));
+const S = { alpha: 0.05, d: 0.5, n: 64 };
+
+const svg = document.getElementById("pw");
+const NS = "http://www.w3.org/2000/svg";
+function mk(tag, a, p) { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); (p || svg).appendChild(e); return e; }
+const ZMIN = -4, ZMAX = 9, X0 = 20, X1 = 700, YB = 250, H = 190;
+const zx = z => X0 + ((z - ZMIN) / (ZMAX - ZMIN)) * (X1 - X0);
+const xz = x => ZMIN + ((x - X0) / (X1 - X0)) * (ZMAX - ZMIN);
+const peak = pdf(0, 0);
+const zy = (z, m) => YB - (pdf(z, m) / peak) * H;
+function area(m, from, to) {
+  from = Math.max(from, ZMIN); to = Math.min(to, ZMAX);
+  if (to <= from) return "";
+  let d = `M${zx(from)},${YB}`;
+  const st = (to - from) / 120;
+  for (let z = from; z <= to + 1e-9; z += st) d += `L${zx(z).toFixed(1)},${zy(z, m).toFixed(1)}`;
+  return d + `L${zx(to)},${YB}Z`;
+}
+function curve(m) { let d = ""; for (let z = ZMIN; z <= ZMAX + 1e-9; z += 0.05) d += (d ? "L" : "M") + zx(z).toFixed(1) + "," + zy(z, m).toFixed(1); return d; }
+
+const gArea = mk("g", {}), gAxis = mk("g", {});
+const hG = mk("g", {});
+mk("rect", { x: -16, y: 18, width: 32, height: YB - 18, fill: "transparent" }, hG);
+mk("line", { x1: 0, x2: 0, y1: 34, y2: YB, stroke: "var(--ink)", "stroke-width": 2.5 }, hG);
+mk("circle", { cx: 0, cy: 34, r: 10, fill: "var(--ink)", stroke: "var(--surface)", "stroke-width": 2, class: "ring" }, hG);
+const hT = mk("text", { x: 0, y: 18, "text-anchor": "middle", "font-size": 16, "font-weight": 700, fill: "var(--ink)" }, hG);
+Epi.svgHandle(hG, {
+  svg, step: 0.05,
+  toValue: px => Epi.clamp(xz(px), 0.13, 3.3),
+  getValue: () => -qnorm(S.alpha / 2),
+  onChange: z => { z = Epi.clamp(z, 0.13, 3.3); S.alpha = Epi.clamp(2 * (1 - Phi(z)), AMIN, AMAX); update(); }
+});
+
+function update() {
+  const z = -qnorm(S.alpha / 2), delta = S.d * Math.sqrt(S.n / 2);
+  const power = (1 - Phi(z - delta)) + Phi(-z - delta), beta = 1 - power;
+  gArea.innerHTML = "";
+  mk("path", { d: area(delta, -z, z), fill: "var(--b-soft)", stroke: "none" }, gArea);
+  mk("path", { d: area(delta, z, 99), fill: "var(--a)", opacity: 0.55 }, gArea);
+  mk("path", { d: area(delta, -99, -z), fill: "var(--a)", opacity: 0.55 }, gArea);
+  mk("path", { d: area(0, z, 99), fill: "var(--bad)", opacity: 0.85 }, gArea);
+  mk("path", { d: area(0, -99, -z), fill: "var(--bad)", opacity: 0.85 }, gArea);
+  mk("path", { d: curve(0), fill: "none", stroke: "var(--muted)", "stroke-width": 2.5 }, gArea);
+  mk("path", { d: curve(delta), fill: "none", stroke: "var(--a)", "stroke-width": 2.5 }, gArea);
+  mk("text", { x: zx(0) - 16, y: YB - H + 16, "text-anchor": "end", "font-size": 15, "font-weight": 700, fill: "var(--muted)", class: "halo" }, gArea).textContent = Epi.t("h0");
+  if (delta > 0.6) mk("text", { x: zx(delta) + 16, y: YB - H + 16, "text-anchor": "start", "font-size": 15, "font-weight": 700, fill: "var(--a)", class: "halo" }, gArea).textContent = Epi.t("h1");
+  // mirror line on the left
+  mk("line", { x1: zx(-z), x2: zx(-z), y1: 50, y2: YB, stroke: "var(--ink)", "stroke-width": 1.5, "stroke-dasharray": "4 4" }, gArea);
+  mk("text", { x: zx(z) + 16, y: 40, "font-size": 14, fill: "var(--ink)" }, gArea).textContent = Epi.t("sig") + " →";
+  mk("text", { x: zx(z) - 16, y: 40, "text-anchor": "end", "font-size": 14, fill: "var(--muted)" }, gArea).textContent = "← " + Epi.t("ns");
+
+  gAxis.innerHTML = "";
+  mk("line", { x1: X0, x2: X1, y1: YB, y2: YB, stroke: "var(--muted)" }, gAxis);
+  for (let t = ZMIN; t <= ZMAX; t += 1) {
+    mk("line", { x1: zx(t), x2: zx(t), y1: YB, y2: YB + 5, stroke: "var(--muted)" }, gAxis);
+    mk("text", { x: zx(t), y: YB + 22, "text-anchor": "middle", class: "tick" }, gAxis).textContent = t;
+  }
+  mk("text", { x: (X0 + X1) / 2, y: YB + 50, "text-anchor": "middle", class: "tick" }, gAxis).textContent = Epi.t("axis");
+  hG.setAttribute("transform", `translate(${zx(z)},0)`);
+  hT.textContent = `${Epi.t("line")}  z = ${z.toFixed(2)}`;
+  hG.setAttribute("aria-label", Epi.t("line")); hG.setAttribute("aria-valuetext", "z " + z.toFixed(2));
+
+  const f = x => x.toFixed(2);
+  document.getElementById("alpha").value = aToS(S.alpha); document.getElementById("alphaO").textContent = S.alpha < 0.01 ? S.alpha.toFixed(3) : f(S.alpha);
+  document.getElementById("d").value = Math.round(S.d * 100); document.getElementById("dO").textContent = f(S.d);
+  document.getElementById("n").value = S.n; document.getElementById("nO").textContent = S.n;
+  document.getElementById("pa").textContent = f(1 - S.alpha);
+  document.getElementById("pc").textContent = S.alpha < 0.01 ? S.alpha.toFixed(3) : f(S.alpha);
+  document.getElementById("pb").textContent = S.d > 0 ? f(beta) : "—";
+  document.getElementById("pd").textContent = S.d > 0 ? f(power) : "—";
+  lastPower = power;
+  const key = [S.alpha, S.d, S.n].join("|");
+  if (key !== simKey) { simKey = key; clearSim(); }
+  Epi.check();
+  document.getElementById("read").textContent = S.d > 0
+    ? Epi.t("read", { d: f(S.d), n: S.n, pw: Math.round(power * 100), b: Math.round(beta * 100) })
+    : Epi.t("readNull", { a: Math.round(S.alpha * 100 * 10) / 10 });
+}
+// ---------- simulation ----------
+const sim = document.getElementById("simsvg");
+let simTimer = 0, simDone = false, simD = null, simKey = "", lastPower = 0;
+function smk(tag, a, p) { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); (p || sim).appendChild(e); return e; }
+function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+function clearSim() {
+  clearTimeout(simTimer); sim.innerHTML = "";
+  const z = -qnorm(S.alpha / 2);
+  smk("line", { x1: X0, x2: X1, y1: 220, y2: 220, stroke: "var(--muted)" });
+  [-z, z].forEach(c => smk("line", { x1: zx(c), x2: zx(c), y1: 10, y2: 220, stroke: "var(--ink)", "stroke-dasharray": "4 4" }));
+  document.getElementById("simCount").textContent = "";
+  const L = S.d > 0 ? [["var(--a)", "sDet"], ["var(--b)", "sMiss"]] : [["var(--bad)", "sFp"], ["var(--muted)", "sOk"]];
+  document.getElementById("simLegend").innerHTML = L.map(([c, k]) => `<span><i class="sw" style="background:${c};border-radius:50%"></i>${Epi.t(k)}</span>`).join("") + `<span>${Epi.t("simHint")}</span>`;
+}
+function runSim() {
+  clearSim();
+  const z = -qnorm(S.alpha / 2), delta = S.d * Math.sqrt(S.n / 2), BW = 0.36, R = 5;
+  const bins = {}; let k = 0, i = 0;
+  simD = S.d;
+  const fast = Epi.reduced();
+  (function drop() {
+    const obs = delta + gauss(), sig = Math.abs(obs) > z;
+    const b = Math.round(obs / BW); bins[b] = (bins[b] || 0) + 1;
+    const cx = zx(Epi.clamp(b * BW, ZMIN + 0.2, ZMAX - 0.2)), cy = 220 - R - (bins[b] - 1) * (2 * R + 0.6);
+    const col = S.d > 0 ? (sig ? "var(--a)" : "var(--b)") : (sig ? "var(--bad)" : "var(--muted)");
+    const c = smk("circle", { cx, cy: Math.max(R, cy), r: R, fill: col });
+    if (!fast) c.animate([{ transform: `translateY(${-cy}px)`, opacity: 0.2 }, { transform: "none", opacity: 1 }], { duration: 380, easing: "cubic-bezier(.5,0,.8,.6)" });
+    if (sig) k++;
+    i++;
+    document.getElementById("simCount").textContent = Epi.t("simCount", { k, n: i });
+    if (i < 100) simTimer = setTimeout(drop, fast ? 0 : 28);
+    else { simDone = true; Epi.check(); }
+  })();
+}
+document.getElementById("simBtn").onclick = runSim;
+
+function renderPresets() {
+  const box = document.getElementById("presets");
+  box.innerHTML = [["pStd", 0.05, 0.5, 64], ["pSmall", 0.05, 0.5, 15], ["pNull", 0.05, 0, 64]]
+    .map(([k, a, d, n]) => `<button class="btn ghost" data-a="${a}" data-d="${d}" data-n="${n}">${Epi.t(k)}</button>`).join("");
+  box.querySelectorAll("button").forEach(b => b.onclick = () => { S.alpha = +b.dataset.a; S.d = +b.dataset.d; S.n = +b.dataset.n; update(); });
+}
+document.getElementById("alpha").addEventListener("input", e => { S.alpha = sToA(+e.target.value); update(); });
+document.getElementById("d").addEventListener("input", e => { S.d = +e.target.value / 100; update(); });
+document.getElementById("n").addEventListener("input", e => { S.n = +e.target.value; update(); });
+Epi.missions("power", document.getElementById("missions"), [
+  { id: "sim", en: "Run 100 simulated trials and watch where they land.", zh: "執行 100 次模擬試驗，看看它們落在哪裡。", test: () => simDone },
+  { id: "null", en: "Set the true difference to 0 and run 100 trials. How many are false positives?", zh: "把真實差異設為 0 並執行 100 次試驗。有幾次是偽陽性？", test: () => simDone && simD === 0 },
+  { id: "a01", en: "Drag the decision line until α = 0.01.", zh: "拖曳決策線，直到 α = 0.01。", test: () => Math.abs(S.alpha - 0.01) < 0.0015 },
+  { id: "p90", en: "Reach at least 90% power while keeping α at 0.05.", zh: "在 α 維持 0.05 下，讓檢定力至少達到 90%。", test: () => lastPower >= 0.9 && S.d > 0 && Math.abs(S.alpha - 0.05) < 0.003 },
+  { id: "n03", en: "Effect size 0.30 and α 0.05: reach 80% power with no more than 180 per group.", zh: "效果量 0.30、α 0.05：每組不超過 180 人，讓檢定力達到 80%。", test: () => Math.abs(S.d - 0.3) < 0.005 && Math.abs(S.alpha - 0.05) < 0.003 && lastPower >= 0.8 && S.n <= 180 }
+]);
+Epi.loopAnim(document.getElementById("loop"), EpiLoops["power"]);
+Epi.init(I18N, () => { renderPresets(); simKey = ""; update(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Confounding vs. selection bias</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/epi.css">
+<style>
+  .rbar { display: grid; grid-template-columns: 150px 1fr 60px; gap: 10px; align-items: center; font-size: 14px; margin: 7px 0; }
+  .rbar .track { height: 20px; background: var(--paper); border-radius: 4px; overflow: hidden; }
+  .rbar .fill { height: 100%; transition: width .2s; }
+  .rr-out { display: flex; gap: 26px; flex-wrap: wrap; margin-top: 12px; }
+  .rr-out .big { font-size: 30px; }
+  .rr-out .lab { font-size: 13px; font-weight: 700; color: var(--muted); }
+  .bins { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+  @media (max-width: 760px) { .bins { grid-template-columns: 1fr; } }
+  .zone { border: 2px dashed var(--rule); border-radius: 8px; padding: 10px; min-height: 120px; }
+  .zone.over { border-style: solid; border-color: var(--ink); background: var(--paper); }
+  .zone[data-zone="pool"] { background: var(--paper); }
+  .zone h3 small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; }
+  .cards { display: flex; flex-direction: column; gap: 8px; min-height: 30px; }
+  .zone[data-zone="pool"] .cards { flex-direction: row; flex-wrap: wrap; }
+  .card { font: inherit; font-size: 14px; text-align: left; line-height: 1.35; padding: 8px 11px; border-radius: 6px; border: 1px solid var(--ink); background: var(--surface); color: var(--ink); cursor: grab; user-select: none; }
+  .zone[data-zone="pool"] .card { flex: 1 1 260px; }
+  .card.dragging { cursor: grabbing; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+  .card.right { border: 2px solid var(--good); } .card.wrong { border: 2px solid var(--bad); }
+  .card .why { display: none; margin-top: 5px; font-size: 13px; color: var(--muted); }
+  .card.right .why, .card.wrong .why { display: block; }
+  .card .mark { font-weight: 800; margin-right: 6px; } .card .mark:empty { display: none; }
+  .card.right .mark { color: var(--good); } .card.wrong .mark { color: var(--bad); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <a class="back" href="index.html" data-i18n="back">All activities</a>
+    <div class="lang-toggle" role="group" aria-label="Language / 語言"><button data-lang="en" lang="en">English</button><button data-lang="zh" lang="zh-Hant">繁體中文</button></div>
+  </header>
+
+  <h1 data-i18n="title">Confounding vs. selection bias</h1>
+  <p class="lede" data-i18n="lede">Both make a useless drug look effective, but for different reasons. Watch how each one arises, then try them yourself.</p>
+
+  <section class="panel loop-panel" id="loop" aria-label="Animated step-by-step explainer" data-i18n-aria="loopAria"></section>
+
+  <section class="panel missions" id="missions" style="margin-bottom:20px"></section>
+
+  <div class="cols">
+    <section class="panel">
+      <h2 data-i18n="cH">Confounding</h2>
+      <p class="small" data-i18n="cP">Half the patients are frail (death risk 40%), half robust (10%). The drug has no effect. Who decides who gets it?</p>
+      <div class="field"><label for="steer"><span data-i18n="steerL">How strongly frailty steers the prescription</span><output id="steerO"></output></label><input type="range" id="steer" min="0" max="100" step="1" value="70"></div>
+      <div id="cBars"></div>
+      <div class="rr-out">
+        <div><div class="lab" data-i18n="crude">Crude RR</div><div class="big" id="cRR"></div></div>
+        <div><div class="lab" data-i18n="strat">RR within frail / within robust</div><div class="big">1.00 / 1.00</div></div>
+      </div>
+      <p class="small" id="cNote" style="margin-top:10px"></p>
+    </section>
+
+    <section class="panel">
+      <h2 data-i18n="sH">Selection bias (loss to follow-up)</h2>
+      <p class="small" data-i18n="sP">A properly randomized trial: frail patients are balanced. The drug has no effect but causes side effects. Frail patients on the drug may drop out and be left out of the analysis.</p>
+      <div class="field"><label for="drop"><span data-i18n="dropL">Frail patients on the drug who drop out</span><output id="dropO"></output></label><input type="range" id="drop" min="0" max="80" step="1" value="50"></div>
+      <div id="sBars"></div>
+      <div class="rr-out">
+        <div><div class="lab" data-i18n="compl">RR among completers</div><div class="big" id="sRR"></div></div>
+        <div><div class="lab" data-i18n="full">RR with complete follow-up</div><div class="big">1.00</div></div>
+      </div>
+      <p class="small" id="sNote" style="margin-top:10px"></p>
+    </section>
+  </div>
+
+  <section class="panel" data-challenge style="margin-top:20px">
+    <h2 data-i18n="sortH">Which bias is it?</h2>
+    <p class="small" data-i18n="sortP">Drag each scenario into a box, or tap it to cycle through the boxes. Then check.</p>
+    <div class="btn-row"><button class="btn" id="checkBtn" data-i18n="check">Check my answers</button><button class="btn ghost" id="resetBtn" data-i18n="reset">Reset</button><span id="score" style="font-weight:700;align-self:center" aria-live="polite"></span></div>
+    <div class="zone" data-zone="pool"><h3 data-i18n="unsorted">Scenarios</h3><div class="cards" id="z-pool"></div></div>
+    <div class="bins">
+      <div class="zone" data-zone="conf"><h3><span data-i18n="bConf">Confounding</span><small data-i18n="bConfS">A third factor linked to exposure and outcome</small></h3><div class="cards" id="z-conf"></div></div>
+      <div class="zone" data-zone="sel"><h3><span data-i18n="bSel">Selection bias</span><small data-i18n="bSelS">How we select or retain participants</small></h3><div class="cards" id="z-sel"></div></div>
+      <div class="zone" data-zone="info"><h3><span data-i18n="bInfo">Information bias</span><small data-i18n="bInfoS">How we gather information or measurements</small></h3><div class="cards" id="z-info"></div></div>
+    </div>
+  </section>
+
+  <section class="notice">
+    <h2 data-i18n="notice">What to notice</h2>
+    <ul>
+      <li data-i18n="n1">Confounding: a third factor associated with both exposure and outcome. Randomization balances confounders, including unmeasured ones; in observational studies, stratification, matching or adjustment control measured confounders. Notice how the within-stratum RR stays 1.00 while the crude RR moves.</li>
+      <li data-i18n="n2">Selection bias is about how we select or retain participants: self-selection, control selection bias, loss to follow-up. It can arise even in a perfectly randomized trial, and adjusting the analysis afterwards cannot easily fix it.</li>
+      <li data-i18n="n3">Information bias is about how we gather information or measurements, for example recall bias or observer bias.</li>
+    </ul>
+  </section>
+</div>
+
+<script src="assets/epi.js"></script>
+<script src="assets/loops.js"></script>
+<script>
+const I18N = {
+  en: {
+    pageTitle: "Confounding vs. selection bias", title: "Confounding vs. selection bias",
+    lede: "Both make a useless drug look effective, but for different reasons. Watch how each one arises, then try them yourself.",
+    cH: "Confounding", cP: "Half the patients are frail (death risk 40%), half robust (10%). The drug has no effect. Who decides who gets it?",
+    steerL: "How strongly frailty steers the prescription", crude: "Crude RR", strat: "RR within frail / within robust",
+    newD: "New drug: died", oldD: "Old drug: died", frailNew: "Frail among new-drug users", frailOld: "Frail among old-drug users",
+    cRand: "0% means a coin decides (randomization): no confounding.",
+    cBias: "Frailty decides who gets the drug, so the crude comparison mixes the effect of frailty with that of the drug.",
+    sH: "Selection bias (loss to follow-up)", sP: "A properly randomized trial: frail patients are balanced. The drug has no effect but causes side effects. Frail patients on the drug may drop out and be left out of the analysis.",
+    dropL: "Frail patients on the drug who drop out", compl: "RR among completers", full: "RR with complete follow-up",
+    newC: "New drug completers: died", oldC: "Old drug: died",
+    sNone: "No one drops out: the randomized comparison is unbiased.",
+    sBias: "The completers on the new drug are healthier than the old-drug group: who was retained, not the drug, creates the difference.",
+    sortH: "Which bias is it?", sortP: "Drag each scenario into a box, or tap it to cycle through the boxes. Then check.",
+    unsorted: "Scenarios", bConf: "Confounding", bConfS: "A third factor linked to exposure and outcome", bSel: "Selection bias", bSelS: "How we select or retain participants", bInfo: "Information bias", bInfoS: "How we gather information or measurements",
+    score: "{r} of {n} correct", left: "{n} still unsorted",
+    n1: "Confounding: a third factor associated with both exposure and outcome. Randomization balances confounders, including unmeasured ones; in observational studies, stratification, matching or adjustment control measured confounders. Notice how the within-stratum RR stays 1.00 while the crude RR moves.",
+    n2: "Selection bias is about how we select or retain participants: self-selection, control selection bias, loss to follow-up. It can arise even in a perfectly randomized trial, and adjusting the analysis afterwards cannot easily fix it.",
+    n3: "Information bias is about how we gather information or measurements, for example recall bias or observer bias."
+  },
+  zh: {
+    pageTitle: "干擾與選樣偏差", title: "干擾與選樣偏差",
+    lede: "兩者都能讓無效的藥物看起來有效，但原因不同。先看它們如何產生，再自己動手試試。",
+    cH: "干擾", cP: "一半病人虛弱（死亡風險 40%），一半強健（10%）。藥物沒有效果。由誰決定誰拿到藥？",
+    steerL: "虛弱程度左右處方的強度", crude: "粗 RR", strat: "虛弱者內／強健者內的 RR",
+    newD: "新藥：死亡", oldD: "舊藥：死亡", frailNew: "新藥使用者中虛弱者比例", frailOld: "舊藥使用者中虛弱者比例",
+    cRand: "0% 代表由硬幣決定（隨機分派）：沒有干擾。",
+    cBias: "虛弱程度決定誰拿到藥，因此粗略比較把虛弱的效果和藥物的效果混在一起。",
+    sH: "選樣偏差（失聯）", sP: "一個正確執行的隨機試驗：虛弱者在兩組平衡。藥物沒有效果但有副作用，新藥組的虛弱病人可能退出而未被納入分析。",
+    dropL: "新藥組虛弱病人退出的比例", compl: "完成者的 RR", full: "完整追蹤時的 RR",
+    newC: "新藥完成者：死亡", oldC: "舊藥：死亡",
+    sNone: "沒有人退出：隨機分派的比較沒有偏差。",
+    sBias: "新藥組的完成者比舊藥組健康：造成差異的是誰被保留，而不是藥物。",
+    sortH: "這是哪一種偏差？", sortP: "把每個情境拖進框中，或點一下依序移動。然後檢查答案。",
+    unsorted: "情境", bConf: "干擾", bConfS: "與曝露及結果都有關的第三因子", bSel: "選樣偏差", bSelS: "我們如何選擇或保留受試者", bInfo: "訊息偏差", bInfoS: "我們如何收集資訊或測量",
+    score: "答對 {r}／{n} 題", left: "還有 {n} 題未分類",
+    n1: "干擾：同時與曝露及結果有關的第三因子。隨機分派能平衡干擾因子（包括未測量者）；觀察性研究則以分層、配對或調整控制已測量的干擾因子。注意分層內的 RR 維持 1.00，而粗 RR 會變動。",
+    n2: "選樣偏差關乎我們如何選擇或保留受試者：自我選擇、對照選擇偏差、失聯。即使隨機分派完美，它仍可能發生，事後調整分析也不容易修正。",
+    n3: "訊息偏差關乎我們如何收集資訊或測量，例如回憶偏差或觀察者偏差。"
+  }
+};
+
+const ITEMS = [
+  { k: "conf", en: "In routine care, doctors prescribe a new drug mainly to healthier patients, who also survive longer.", zh: "在常規醫療中，醫師主要把新藥開給較健康的病人，而這些人本來就活得較久。",
+    wen: "Health status is a third factor linked to both the drug and survival (confounding by indication).", wzh: "健康狀態是同時與用藥及存活有關的第三因子（適應症干擾）。" },
+  { k: "conf", en: "Coffee drinkers have more lung cancer, but coffee drinkers also smoke more.", zh: "喝咖啡的人肺癌較多，但喝咖啡的人也抽較多菸。",
+    wen: "Smoking is linked to coffee drinking and causes lung cancer.", wzh: "抽菸與喝咖啡有關，並會導致肺癌。" },
+  { k: "conf", en: "Older people are both more likely to be vaccinated and more likely to die.", zh: "年長者比較可能接種疫苗，也比較可能死亡。",
+    wen: "Age is linked to both vaccination and death.", wzh: "年齡同時與接種及死亡有關。" },
+  { k: "conf", en: "People with lower income are less likely to be screened and more likely to die of cancer.", zh: "收入較低的人比較不會接受篩檢，也比較可能死於癌症。",
+    wen: "Income is linked to both screening and cancer death.", wzh: "收入同時與篩檢及癌症死亡有關。" },
+  { k: "sel", en: "Patients with side effects drop out of the drug arm and are left out of the analysis.", zh: "出現副作用的病人退出藥物組，未被納入分析。",
+    wen: "Loss-to-follow-up bias: who is retained depends on treatment and prognosis.", wzh: "失聯偏差：誰被保留取決於治療與預後。" },
+  { k: "sel", en: "Only people who answer an advertisement join the study, and they are healthier than those who do not.", zh: "只有回應廣告的人加入研究，而他們比沒有回應的人健康。",
+    wen: "Self-selection: how participants enter the study.", wzh: "自我選擇：受試者如何進入研究。" },
+  { k: "sel", en: "In a case-control study, controls are hospital patients whose illnesses are related to the exposure.", zh: "病例對照研究中，對照組是住院病人，而他們的疾病與曝露有關。",
+    wen: "Control selection bias: the controls do not represent the exposure distribution of the source population.", wzh: "對照選擇偏差：對照組無法代表來源族群的曝露分布。" },
+  { k: "info", en: "The outcome assessor knows which treatment each patient received.", zh: "結果評估者知道每位病人接受哪種治療。",
+    wen: "Observation / ascertainment bias: how outcomes are measured.", wzh: "觀察／確認偏差：結果如何被測量。" },
+  { k: "info", en: "Cases recall past exposures more thoroughly than controls.", zh: "病例比對照更努力回想過去的曝露。",
+    wen: "Recall bias: differential misclassification of exposure.", wzh: "回憶偏差：曝露的差異性錯誤分類。" },
+  { k: "info", en: "A common pesticide is left off the questionnaire for everyone.", zh: "問卷對所有人都漏列了一種常見農藥。",
+    wen: "Non-differential misclassification: the same measurement error in both groups.", wzh: "非差異性錯誤分類：兩組的測量誤差相同。" }
+];
+const order = [4, 0, 8, 5, 1, 9, 6, 2, 7, 3];
+
+// ---------- tools ----------
+let lastSteer = 0.7, lastCRR = 1, lastDrop = 0.5, lastSRR = 1, perfect = false;
+function bar(lab, v, col, max) { return `<div class="rbar"><span>${lab}</span><div class="track"><div class="fill" style="width:${(v / max) * 100}%;background:${col}"></div></div><span class="num">${Math.round(v * 100)}%</span></div>`; }
+function update() {
+  const st = +document.getElementById("steer").value / 100, dr = +document.getElementById("drop").value / 100;
+  document.getElementById("steerO").textContent = Math.round(st * 100) + "%";
+  document.getElementById("dropO").textContent = Math.round(dr * 100) + "%";
+  const pnf = 0.5 - 0.45 * st, pnr = 0.5 + 0.45 * st;              // P(new drug | frail / robust)
+  const nNew = 0.5 * pnf + 0.5 * pnr, nOld = 1 - nNew;
+  const rNew = (0.5 * pnf * 0.4 + 0.5 * pnr * 0.1) / nNew, rOld = (0.5 * (1 - pnf) * 0.4 + 0.5 * (1 - pnr) * 0.1) / nOld;
+  const frN = 0.5 * pnf / nNew, frO = 0.5 * (1 - pnf) / nOld;
+  lastSteer = st; lastCRR = rNew / rOld;
+  document.getElementById("cBars").innerHTML = bar(Epi.t("frailNew"), frN, "var(--bad)", 1) + bar(Epi.t("frailOld"), frO, "var(--bad)", 1) + bar(Epi.t("newD"), rNew, "var(--a)", 0.5) + bar(Epi.t("oldD"), rOld, "var(--b)", 0.5);
+  document.getElementById("cRR").textContent = lastCRR.toFixed(2);
+  document.getElementById("cNote").textContent = Epi.t(st < 0.005 ? "cRand" : "cBias");
+  const fK = 0.5 * (1 - dr), rC = (fK * 0.4 + 0.5 * 0.1) / (fK + 0.5), rO2 = 0.25;
+  lastDrop = dr; lastSRR = rC / rO2;
+  document.getElementById("sBars").innerHTML = bar(Epi.t("newC"), rC, "var(--a)", 0.5) + bar(Epi.t("oldC"), rO2, "var(--b)", 0.5);
+  document.getElementById("sRR").textContent = lastSRR.toFixed(2);
+  document.getElementById("sNote").textContent = Epi.t(dr < 0.005 ? "sNone" : "sBias");
+  renderCards();
+  Epi.check();
+}
+["steer", "drop"].forEach(id => document.getElementById(id).addEventListener("input", update));
+
+// ---------- sorter ----------
+const zones = { pool: document.getElementById("z-pool"), conf: document.getElementById("z-conf"), sel: document.getElementById("z-sel"), info: document.getElementById("z-info") };
+const state = ITEMS.map(() => "pool"), els = [];
+let checked = false;
+order.forEach(i => {
+  const b = document.createElement("button");
+  b.className = "card";
+  b.innerHTML = `<span class="mark"></span><span class="txt"></span><span class="why"></span>`;
+  Epi.dragToZones(b, { onDrop: (el, z) => place(i, z), onTap: () => place(i, { pool: "conf", conf: "sel", sel: "info", info: "pool" }[state[i]]) });
+  els[i] = b; zones.pool.appendChild(b);
+});
+function place(i, z) { state[i] = z; zones[z].appendChild(els[i]); checked = false; renderCards(); }
+function renderCards() {
+  const L = Epi.lang;
+  ITEMS.forEach((it, i) => {
+    const el = els[i];
+    el.querySelector(".txt").textContent = it[L];
+    el.querySelector(".why").textContent = it["w" + L];
+    el.classList.remove("right", "wrong"); el.querySelector(".mark").textContent = "";
+    if (checked && state[i] !== "pool") { const ok = state[i] === it.k; el.classList.add(ok ? "right" : "wrong"); el.querySelector(".mark").textContent = ok ? "✓" : "✗"; }
+  });
+  const sc = document.getElementById("score");
+  if (checked) {
+    const r = ITEMS.filter((it, i) => state[i] === it.k).length, left = state.filter(s => s === "pool").length;
+    sc.textContent = Epi.t("score", { r, n: ITEMS.length }) + (left ? "; " + Epi.t("left", { n: left }) : "");
+  } else sc.textContent = "";
+}
+document.getElementById("checkBtn").onclick = () => {
+  checked = true;
+  if (ITEMS.every((it, i) => state[i] === it.k)) { perfect = true; const b = document.getElementById("checkBtn").getBoundingClientRect(); Epi.confetti(b.left + b.width / 2, b.top); }
+  renderCards(); Epi.check();
+};
+document.getElementById("resetBtn").onclick = () => { Epi.flip(els, () => order.forEach(i => { state[i] = "pool"; zones.pool.appendChild(els[i]); }), { stagger: 20 }); checked = false; renderCards(); };
+
+Epi.missions("confounding-selection", document.getElementById("missions"), [
+  { id: "max", en: "Let frailty steer the prescription as strongly as possible. How far does the crude RR fall below 1?", zh: "讓虛弱程度最強烈地左右處方。粗 RR 會低於 1 多少？", test: () => lastSteer >= 0.99 },
+  { id: "coin", en: "Turn the steering down to 0%, which is randomization. What happens to the crude RR?", zh: "把左右程度調到 0%，也就是隨機分派。粗 RR 會怎樣？", test: () => lastSteer <= 0.005 },
+  { id: "drop", en: "Find a drop-out level that makes the drug look like it cuts deaths by at least 30% among completers.", zh: "找出讓藥物在完成者中看起來減少至少 30% 死亡的退出比例。", test: () => lastSRR <= 0.7 },
+  { id: "sort", en: "Sort all 10 scenarios correctly.", zh: "把 10 個情境全部分類正確。", test: () => perfect }
+]);
+Epi.loopAnim(document.getElementById("loop"), EpiLoops["confounding-selection"]);
+Epi.init(I18N, update);
+</script>
+</body>
+</html>

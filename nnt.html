@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Relative risk, risk difference and NNT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/epi.css">
+<style>
+  .arrays { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 640px) { .arrays { grid-template-columns: 1fr; } }
+  .arrays h3 { display: flex; justify-content: space-between; gap: 8px; }
+  canvas { width: 100%; display: block; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+  .stat { border-top: 3px solid var(--ink); padding-top: 8px; }
+  .stat .name { font-weight: 700; font-size: 14px; }
+  .stat .f { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .stat.hl { border-color: var(--good); }
+  .people { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 10px; }
+  .people i { width: 12px; height: 12px; border-radius: 50%; background: var(--rule); display: block; }
+  .people i { transition: opacity .25s, transform .25s; }
+  .people i.wait { opacity: .12; transform: scale(.6); }
+  .people i.pulse { animation: pulse .9s ease 2; }
+  @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.7); } }
+  .people i.one { background: var(--good); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--good); }
+  .people i.harm { background: var(--bad); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--bad); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <a class="back" href="index.html" data-i18n="back">All activities</a>
+    <div class="lang-toggle" role="group" aria-label="Language / 語言"><button data-lang="en" lang="en">English</button><button data-lang="zh" lang="zh-Hant">繁體中文</button></div>
+  </header>
+
+  <h1 data-i18n="title">Relative risk, risk difference and NNT</h1>
+  <p class="lede" data-i18n="lede">The same relative risk can mean very different things in practice. Set the risk of the outcome with and without treatment, and compare the relative measure with the absolute ones.</p>
+
+  <section class="panel loop-panel" id="loop" aria-label="Animated step-by-step explainer" data-i18n-aria="loopAria"></section>
+
+  <section class="panel missions" id="missions" style="margin-bottom:20px"></section>
+
+  <div class="cols-2-1">
+    <section class="panel">
+      <h2 data-i18n="arrH">1,000 untreated vs. 1,000 treated patients</h2>
+      <div class="arrays">
+        <div><h3><span class="b" data-i18n="untr">Untreated (control)</span><span class="num small" id="cN"></span></h3><canvas id="cv0" aria-hidden="true"></canvas></div>
+        <div><h3><span class="a" data-i18n="tr">Treated</span><span class="num small" id="tN"></span></h3><canvas id="cv1" aria-hidden="true"></canvas></div>
+      </div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--bad)"></i><span data-i18n="lgEv">Has the outcome (e.g. death)</span></span>
+        <span><i class="sw" style="background:var(--good)"></i><span data-i18n="lgPrev">Outcome prevented by treatment</span></span>
+        <span><i class="sw" style="background:var(--rule)"></i><span data-i18n="lgNo">No outcome</span></span>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <h2 data-i18n="setH">Risks</h2>
+      <div class="field"><label for="rc"><span data-i18n="rcL">Risk without treatment</span><output id="rcO"></output></label><input type="range" id="rc" min="0" max="500" step="5"></div>
+      <div class="field"><label for="rt"><span data-i18n="rtL">Risk with treatment</span><output id="rtO"></output></label><input type="range" id="rt" min="0" max="500" step="5"></div>
+      <div class="btn-row" id="presets" style="flex-direction:column;align-items:stretch"></div>
+    </aside>
+  </div>
+
+  <section class="panel" style="margin-top:20px">
+    <div class="stats">
+      <div class="stat"><div class="name" data-i18n="rr">Relative risk</div><div class="big" id="rr"></div><div class="f" id="fRr"></div></div>
+      <div class="stat"><div class="name" id="ardName"></div><div class="big" id="ard"></div><div class="f" id="fArd"></div></div>
+      <div class="stat hl"><div class="name" id="nntName"></div><div class="big" id="nnt"></div><div class="f" id="fNnt"></div></div>
+    </div>
+    <p id="nntRead" style="margin-top:16px;font-weight:600" aria-live="polite"></p>
+    <div class="people" id="people" aria-hidden="true"></div>
+    <div class="btn-row" style="margin-top:14px;align-items:center"><button class="btn play" id="treatBtn" data-i18n="treatBtn">Treat patients one by one</button><span id="treatCount" class="num" style="font-weight:700" aria-live="polite"></span></div>
+  </section>
+
+  <section class="notice">
+    <h2 data-i18n="notice">What to notice</h2>
+    <ul>
+      <li data-i18n="n1">Compare “Office hour example” with “Rare outcome, same relative risk”: the relative risk is 0.75 in both, but you need to treat 20 people in one case and 200 in the other to prevent one event.</li>
+      <li data-i18n="n2">NNT = 1 ÷ (risk in untreated − risk in treated), rounded up to the next whole number. If treatment raises the risk, the same calculation gives the number needed to harm (NNH).</li>
+      <li data-i18n="n3">NNT speaks to practitioners, but it should be reported with a 95% confidence interval and does not capture quality of life.</li>
+    </ul>
+  </section>
+</div>
+
+<script src="assets/epi.js"></script>
+<script src="assets/loops.js"></script>
+<script>
+const I18N = {
+  en: {
+    pageTitle: "Relative risk, risk difference and NNT", title: "Relative risk, risk difference and NNT",
+    lede: "The same relative risk can mean very different things in practice. Set the risk of the outcome with and without treatment, and compare the relative measure with the absolute ones.",
+    arrH: "1,000 untreated vs. 1,000 treated patients", untr: "Untreated (control)", tr: "Treated",
+    treatBtn: "Treat patients one by one", treated: "Treated: {i}", helped: "Treated: {i}. One person helped!", harmed: "Treated: {i}. One person harmed.",
+    lgEv: "Has the outcome (e.g. death)", lgPrev: "Outcome prevented by treatment", lgNo: "No outcome",
+    setH: "Risks", rcL: "Risk without treatment", rtL: "Risk with treatment",
+    pSlide: "Office hour example (NNT = 20)", pRare: "Rare outcome, same relative risk", pHarm: "Side effect (NNH)", pNone: "No effect",
+    events: "{n} events",
+    rr: "Relative risk", arr: "Absolute risk reduction", ari: "Absolute risk increase",
+    nnt: "Number needed to treat (NNT)", nnh: "Number needed to harm (NNH)",
+    nntRead: "Treat {n} people to prevent one event. Each dot below is one treated person; the green one is helped.",
+    nnhRead: "Treating {n} people causes one additional event. Each dot below is one treated person; the red one is harmed.",
+    nntBig: "Treat {n} people to prevent one event (too many to draw).",
+    noEff: "Risks are equal: treatment makes no difference, so NNT is infinite.",
+    n1: "Compare “Office hour example” with “Rare outcome, same relative risk”: the relative risk is 0.75 in both, but you need to treat 20 people in one case and 200 in the other to prevent one event.",
+    n2: "NNT = 1 ÷ (risk in untreated − risk in treated), rounded up to the next whole number. If treatment raises the risk, the same calculation gives the number needed to harm (NNH).",
+    n3: "NNT speaks to practitioners, but it should be reported with a 95% confidence interval and does not capture quality of life."
+  },
+  zh: {
+    pageTitle: "相對危險性、危險差與 NNT", title: "相對危險性、危險差與 NNT",
+    lede: "同樣的相對危險性，在實務上的意義可能相差很大。設定有治療與沒有治療時結果發生的風險，比較相對指標與絕對指標。",
+    arrH: "1,000 位未治療者與 1,000 位治療者", untr: "未治療（對照組）", tr: "治療組",
+    treatBtn: "一位一位治療病人", treated: "已治療：{i} 人", helped: "已治療：{i} 人。有一人受益！", harmed: "已治療：{i} 人。有一人受害。",
+    lgEv: "發生結果（例如死亡）", lgPrev: "因治療而避免的結果", lgNo: "未發生結果",
+    setH: "風險", rcL: "未治療時的風險", rtL: "治療後的風險",
+    pSlide: "課堂範例（NNT = 20）", pRare: "罕見結果，相對危險性相同", pHarm: "副作用（NNH）", pNone: "沒有效果",
+    events: "{n} 件事件",
+    rr: "相對危險性", arr: "絕對風險降低", ari: "絕對風險增加",
+    nnt: "需治療人數（NNT）", nnh: "需傷害人數（NNH）",
+    nntRead: "需治療 {n} 人才能避免一件事件。下方每個點代表一位接受治療者，綠色的那一位因此受益。",
+    nnhRead: "每治療 {n} 人就會多造成一件事件。下方每個點代表一位接受治療者，紅色的那一位因此受害。",
+    nntBig: "需治療 {n} 人才能避免一件事件（人數太多，無法全部畫出）。",
+    noEff: "兩組風險相同：治療沒有差異，因此 NNT 為無限大。",
+    n1: "比較「課堂範例」與「罕見結果，相對危險性相同」：兩者的相對危險性都是 0.75，但一個需治療 20 人、另一個需治療 200 人才能避免一件事件。",
+    n2: "NNT = 1 ÷（未治療組風險 − 治療組風險），並無條件進位到下一個整數。若治療使風險上升，同樣的計算得到的是需傷害人數（NNH）。",
+    n3: "NNT 對臨床工作者較直觀，但應同時報告 95% 信賴區間，而且它沒有反映生活品質。"
+  }
+};
+const S = { rc: 200, rt: 150 }; // per 1,000
+let lastNNT = NaN, lastHarm = false, lastRR = NaN, treatPlayed = false, treatTimer = 0;
+function playTreat() {
+  clearTimeout(treatTimer);
+  const dots = [...document.querySelectorAll("#people i")];
+  const out = document.getElementById("treatCount");
+  if (!dots.length) return;
+  dots.forEach(d => { d.classList.add("wait"); d.classList.remove("pulse"); });
+  const per = Epi.reduced() ? 0 : Math.max(15, Math.min(140, 3500 / dots.length));
+  let i = 0;
+  (function step() {
+    dots[i].classList.remove("wait");
+    i++;
+    out.textContent = Epi.t("treated", { i });
+    if (i < dots.length) { treatTimer = setTimeout(step, per); return; }
+    const last = dots[dots.length - 1];
+    last.classList.add("pulse");
+    out.textContent = Epi.t(lastHarm ? "harmed" : "helped", { i });
+    if (!lastHarm) { const r = last.getBoundingClientRect(); Epi.confetti(r.left + 6, r.top); }
+    treatPlayed = true; Epi.check();
+  })();
+}
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+function drawArray(cv, kinds) {
+  const cols = 40, rows = 25, w = cv.clientWidth, cell = w / cols, h = cell * rows, dpr = window.devicePixelRatio || 1;
+  if (!w) return;
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.height = h + "px";
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  const g = Math.max(1, cell * 0.18);
+  let i = 0;
+  kinds.forEach(([n, col]) => {
+    ctx.fillStyle = col;
+    for (let k = 0; k < n && i < 1000; k++, i++) {
+      const x = (i % cols) * cell + cell / 2, y = Math.floor(i / cols) * cell + cell / 2;
+      ctx.beginPath(); ctx.arc(x, y, (cell - g) / 2, 0, Math.PI * 2); ctx.fill();
+    }
+  });
+}
+
+function update() {
+  ["rc", "rt"].forEach(k => { document.getElementById(k).value = S[k]; document.getElementById(k + "O").textContent = (S[k] / 10).toFixed(1) + "%"; });
+  const bad = cssVar("--bad"), good = cssVar("--good"), rule = cssVar("--rule");
+  const ec = S.rc, et = S.rt;
+  drawArray(document.getElementById("cv0"), [[ec, bad], [1000 - ec, rule]]);
+  if (et <= ec) drawArray(document.getElementById("cv1"), [[et, bad], [ec - et, good], [1000 - ec, rule]]);
+  else drawArray(document.getElementById("cv1"), [[et, bad], [1000 - et, rule]]);
+  document.getElementById("cN").textContent = Epi.t("events", { n: ec });
+  document.getElementById("tN").textContent = Epi.t("events", { n: et });
+
+  const rc = S.rc / 1000, rt = S.rt / 1000, diff = rc - rt;
+  const harm = diff < 0;
+  document.getElementById("rr").textContent = rc > 0 ? (rt / rc).toFixed(2) : "—";
+  document.getElementById("fRr").textContent = `${(rt * 100).toFixed(1)}% ÷ ${(rc * 100).toFixed(1)}%`;
+  document.getElementById("ardName").textContent = Epi.t(harm ? "ari" : "arr");
+  document.getElementById("ard").textContent = (Math.abs(diff) * 100).toFixed(1) + "%";
+  document.getElementById("fArd").textContent = `${(rc * 100).toFixed(1)}% − ${(rt * 100).toFixed(1)}%`;
+  document.getElementById("nntName").textContent = Epi.t(harm ? "nnh" : "nnt");
+  const ppl = document.getElementById("people"), rd = document.getElementById("nntRead");
+  if (Math.abs(diff) < 1e-9) {
+    document.getElementById("nnt").textContent = "∞"; document.getElementById("fNnt").textContent = "1 ÷ 0";
+    rd.textContent = Epi.t("noEff"); ppl.innerHTML = ""; lastNNT = Infinity; return;
+  }
+  const raw = 1 / Math.abs(diff), nnt = Math.ceil(raw - 1e-9);
+  lastNNT = nnt; lastHarm = harm; lastRR = rc > 0 ? rt / rc : NaN;
+  clearTimeout(treatTimer); document.getElementById("treatCount").textContent = "";
+  Epi.check();
+  document.getElementById("nnt").textContent = nnt;
+  document.getElementById("fNnt").textContent = `1 ÷ ${Math.abs(diff).toFixed(3)} = ${raw.toFixed(1)}`;
+  if (nnt > 400) { rd.textContent = Epi.t("nntBig", { n: nnt }); ppl.innerHTML = ""; return; }
+  rd.textContent = Epi.t(harm ? "nnhRead" : "nntRead", { n: nnt });
+  let h = "";
+  for (let i = 0; i < nnt; i++) h += i === nnt - 1 ? `<i class="${harm ? "harm" : "one"}"></i>` : "<i></i>";
+  ppl.innerHTML = h;
+}
+function renderPresets() {
+  const box = document.getElementById("presets");
+  box.innerHTML = [["pSlide", 200, 150], ["pRare", 20, 15], ["pHarm", 50, 100], ["pNone", 100, 100]]
+    .map(([k, c, t]) => `<button class="btn ghost" data-c="${c}" data-t="${t}">${Epi.t(k)}</button>`).join("");
+  box.querySelectorAll("button").forEach(b => b.onclick = () => { S.rc = +b.dataset.c; S.rt = +b.dataset.t; update(); });
+}
+["rc", "rt"].forEach(k => document.getElementById(k).addEventListener("input", e => { S[k] = +e.target.value; update(); }));
+document.getElementById("treatBtn").onclick = playTreat;
+Epi.missions("nnt", document.getElementById("missions"), [
+  { id: "play", en: "Press “Treat patients one by one” and wait for someone to be helped.", zh: "按下「一位一位治療病人」，等到有人受益。", test: () => treatPlayed },
+  { id: "n10", en: "Find risks that give an NNT of exactly 10.", zh: "找出讓 NNT 剛好等於 10 的風險組合。", test: () => !lastHarm && lastNNT === 10 },
+  { id: "rr05", en: "Find a relative risk of 0.50 with an NNT above 100.", zh: "找出相對危險性 0.50、但 NNT 大於 100 的情境。", test: () => Math.abs(lastRR - 0.5) < 0.005 && lastNNT > 100 && !lastHarm },
+  { id: "nnh", en: "Make the treatment harmful, with a number needed to harm of 20 or fewer.", zh: "讓治療變成有害，且需傷害人數不超過 20。", test: () => lastHarm && lastNNT <= 20 }
+]);
+window.addEventListener("resize", () => { if (document.getElementById("cv0")) update(); });
+Epi.loopAnim(document.getElementById("loop"), EpiLoops["nnt"]);
+Epi.init(I18N, () => { renderPresets(); update(); });
+</script>
+</body>
+</html>
